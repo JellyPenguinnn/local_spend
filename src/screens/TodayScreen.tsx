@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CalendarDays, Plus } from "lucide-react";
+import { CalendarDays, History, Plus } from "lucide-react";
 import { getDailyTotals } from "../lib/analytics";
 import { fallbackCategoryId } from "../lib/categories";
 import { formatLocalIsoDate, parseLocalDate } from "../lib/date";
@@ -42,6 +42,7 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
     [data.expenses, today]
   );
   const todayTotal = getDailyTotals(todayExpenses)[today] ?? 0;
+  const recentTemplates = useMemo(() => getRecentTemplates(data.expenses), [data.expenses]);
   const dueRules = useMemo(
     () => data.recurringRules.filter((rule) => rule.isActive && rule.nextDate <= today).sort((a, b) => a.nextDate.localeCompare(b.nextDate) || b.amount - a.amount),
     [data.recurringRules, today]
@@ -94,6 +95,20 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
     setQuickText("");
     setQuickMessage("");
     setIsEntryOpen(false);
+  }
+
+  function applyRecentTemplate(expense: Expense) {
+    setEditingExpense(null);
+    setQuickText("");
+    setQuickDraft({
+      amount: expense.amount,
+      date: today,
+      categoryId: expense.categoryId,
+      title: expense.title ?? "",
+      remark: "",
+      paymentMethod: expense.paymentMethod ?? data.appSettings.paymentMethods[0] ?? "Other"
+    });
+    setQuickMessage("Recent spend ready. Check it before saving.");
   }
 
   return (
@@ -154,9 +169,27 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
               message={quickMessage}
               isParsing={isParsing}
               aiEnabled={data.aiSettings.provider !== "none"}
+              autoFocus
               onChange={setQuickText}
               onDraft={() => void parseQuickAdd()}
             />
+          )}
+          {!editingExpense && !quickDraft && !quickText && recentTemplates.length > 0 && (
+            <div className="recent-spend-shortcuts" aria-label="Recent spending shortcuts">
+              <p className="eyebrow">Recent</p>
+              <div>
+                {recentTemplates.map((expense) => {
+                  const category = data.categories.find((item) => item.id === expense.categoryId);
+                  return (
+                    <button type="button" key={expense.id} onClick={() => applyRecentTemplate(expense)}>
+                      <History size={14} />
+                      <span>{expense.title || category?.name || "Spend"}</span>
+                      <strong>{formatMoney(expense.amount, expense.currency || data.appSettings.currency)}</strong>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           )}
 
           <ExpenseForm
@@ -209,4 +242,20 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
       </div>
     </div>
   );
+}
+
+function getRecentTemplates(expenses: Expense[]): Expense[] {
+  const seen = new Set<string>();
+  const templates: Expense[] = [];
+  const sorted = [...expenses].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+
+  for (const expense of sorted) {
+    const key = `${expense.title?.trim().toLowerCase() || expense.categoryId}|${expense.categoryId}|${expense.paymentMethod ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    templates.push(expense);
+    if (templates.length === 3) break;
+  }
+
+  return templates;
 }

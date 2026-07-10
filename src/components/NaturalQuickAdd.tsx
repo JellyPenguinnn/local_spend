@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Sparkles, Wand2 } from "lucide-react";
 
 interface NaturalQuickAddProps {
@@ -5,19 +6,30 @@ interface NaturalQuickAddProps {
   message?: string;
   isParsing?: boolean;
   aiEnabled?: boolean;
+  autoFocus?: boolean;
   onChange: (value: string) => void;
   onDraft: () => void;
 }
 
 export const NATURAL_ENTRY_EXAMPLE = "kopi 2.20 yakun paynow";
 
-export function NaturalQuickAdd({ value, message, isParsing = false, aiEnabled = false, onChange, onDraft }: NaturalQuickAddProps) {
+export function NaturalQuickAdd({ value, message, isParsing = false, aiEnabled = false, autoFocus = false, onChange, onDraft }: NaturalQuickAddProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (autoFocus) {
+      inputRef.current?.focus({ preventScroll: true });
+    }
+  }, [autoFocus]);
+
   return (
     <div className="quick-add quiet">
       <label>
         <span>Quick draft</span>
         <div className="inline-input">
           <input
+            ref={inputRef}
+            autoFocus={autoFocus}
             value={value}
             placeholder={NATURAL_ENTRY_EXAMPLE}
             onChange={(event) => onChange(event.target.value)}
@@ -37,7 +49,7 @@ export function NaturalQuickAdd({ value, message, isParsing = false, aiEnabled =
           AI optional
         </span>
       )}
-      {message && <p className="form-note">{message}</p>}
+      {message && <p className="form-note" aria-live="polite">{message}</p>}
     </div>
   );
 }

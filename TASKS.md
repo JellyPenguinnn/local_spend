@@ -55,6 +55,7 @@
 - Added Summary category drill-down: category boxes below the donut open a focused monthly list with each spend's date, title, and amount.
 - Improved natural-language expense drafting with weighted local category rules, stronger Singapore merchant/payment recognition, `Other` fallback instead of default Food, and user-facing `Description` labels for spending and bill forms.
 - Finalized the NLP approach from research: deterministic slot extraction, Singapore-specific aliases, weighted category rules, and active-profile history override for weak guesses.
+- Fixed the shared Calendar/Summary month selector so it renders in the viewport top layer on iPhone, uses bounded scroll columns, and cannot be displaced by page transitions; Today add now focuses the natural input and offers three compact recent-spend shortcuts for faster reviewed entry.
 - Added unit tests for core local logic.
 - Verified lint, TypeScript/web build, JS tests, Rust SQLite tests, and Tauri `.app` build.
 

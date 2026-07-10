@@ -969,6 +969,64 @@ h3 {
   border-bottom: 1px solid var(--border);
 }
 
+.recent-spend-shortcuts {
+  display: grid;
+  gap: 0.45rem;
+  margin: -0.2rem 0 0.2rem;
+}
+
+.recent-spend-shortcuts > .eyebrow {
+  margin: 0;
+}
+
+.recent-spend-shortcuts > div {
+  display: flex;
+  gap: 0.45rem;
+  overflow-x: auto;
+  padding: 0.05rem 0 0.18rem;
+  scrollbar-width: none;
+}
+
+.recent-spend-shortcuts > div::-webkit-scrollbar {
+  display: none;
+}
+
+.recent-spend-shortcuts button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.12rem 0.38rem;
+  flex: 0 0 auto;
+  min-width: 136px;
+  max-width: 190px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.58rem;
+  background: var(--material-raised);
+  color: var(--text);
+  text-align: left;
+  box-shadow: var(--inner-glow);
+}
+
+.recent-spend-shortcuts button svg {
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: var(--accent);
+}
+
+.recent-spend-shortcuts button span {
+  overflow: hidden;
+  font-size: 0.78rem;
+  font-weight: 760;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-spend-shortcuts button strong {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 720;
+}
+
 .inline-input {
   align-items: stretch;
 }
@@ -1325,6 +1383,12 @@ h3 {
   z-index: 4;
 }
 
+.month-popover-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 998;
+}
+
 .month-display {
   display: inline-flex;
   align-items: center;
@@ -1347,11 +1411,13 @@ h3 {
 }
 
 .month-popover {
-  position: absolute;
-  top: calc(100% + 0.55rem);
-  right: 44px;
+  position: fixed;
+  top: var(--month-popover-top);
+  left: var(--month-popover-left);
   z-index: 999;
   width: min(340px, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow: hidden;
   border: 1px solid var(--hairline);
   border-radius: var(--radius);
   background:
@@ -1384,6 +1450,17 @@ h3 {
   display: grid;
   grid-template-columns: 88px minmax(0, 1fr);
   gap: 0.6rem;
+}
+
+.month-column-labels {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 0.6rem;
+  padding: 0 0.25rem 0.38rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .year-column {
@@ -3199,22 +3276,39 @@ h3 {
 
   .month-popover {
     position: fixed;
-    left: 0.75rem;
-    right: 0.75rem;
+    left: calc(0.75rem + env(safe-area-inset-left));
+    right: calc(0.75rem + env(safe-area-inset-right));
     top: auto;
     bottom: calc(5.4rem + env(safe-area-inset-bottom));
     z-index: 999;
     width: auto;
-    max-height: 62vh;
+    max-height: min(68dvh, 460px);
     border-radius: 18px;
   }
 
-  .month-select-layout {
-    grid-template-columns: 86px minmax(0, 1fr);
+  .month-popover-layer {
+    background: rgba(24, 23, 20, 0.12);
+    backdrop-filter: blur(2px);
   }
 
-  .year-column {
-    max-height: 230px;
+  .month-column-labels,
+  .month-select-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .year-column,
+  .month-grid-compact {
+    grid-template-columns: minmax(0, 1fr);
+    max-height: min(38dvh, 260px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scroll-snap-type: y proximity;
+  }
+
+  .year-column button,
+  .month-grid-compact button {
+    min-height: 42px;
+    scroll-snap-align: center;
   }
 
   .selected-day-card {
