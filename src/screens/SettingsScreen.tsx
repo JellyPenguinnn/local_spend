@@ -157,6 +157,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
           dayOfMonth: Number(recurringDraft.startDate.slice(8, 10)),
           startDate: recurringDraft.startDate,
           nextDate: recurringDraft.startDate,
+          discardedDates: editingRule?.discardedDates ?? [],
           isActive: editingRule?.isActive ?? true,
           createdAt: editingRule?.createdAt ?? "",
           updatedAt: editingRule?.updatedAt ?? ""
@@ -490,6 +491,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
       dayOfMonth: Number(recurringDraft.startDate.slice(8, 10)),
       startDate: recurringDraft.startDate,
       nextDate: scheduleChanged ? recurringDraft.startDate : (existingRule?.nextDate ?? recurringDraft.startDate),
+      discardedDates: scheduleChanged ? [] : (existingRule?.discardedDates ?? []),
       isActive: existingRule?.isActive ?? true,
       createdAt: existingRule?.createdAt ?? timestamp,
       updatedAt: timestamp

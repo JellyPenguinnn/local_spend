@@ -10,7 +10,15 @@ import { parseExpenseLocal } from "./ai/localParser";
 import { parseExpenseWithAiOrLocal } from "./ai/providers";
 import { parseJsonObject, validateAiCategoryJson, validateAiExpenseJson, validateAiInsightsJson } from "./ai/schema";
 import { formatCalendarCellAmount, formatMoney, parseMoney, roundMoney } from "./money";
-import { advanceRecurringRulePastRecorded, materializeDueRecurring, resolveRecurringRuleNextDate } from "./recurring";
+import { getFrequentExpenseTemplates } from "./expenseTemplates";
+import {
+  advanceRecurringRulePastRecorded,
+  discardRecurringOccurrence,
+  getDueRecurringOccurrences,
+  materializeDueRecurring,
+  recordRecurringOccurrence,
+  resolveRecurringRuleNextDate
+} from "./recurring";
 import { createRepository } from "./storage/repository";
 import { MAX_WALLPAPERS, clampWallpaperOpacity, trimWallpapers } from "./wallpaper";
 import type { Expense, ProfileMeta, RecurringRule, WallpaperImage } from "./types";
@@ -31,6 +39,23 @@ describe("money formatting and parsing", () => {
     expect(formatCalendarCellAmount(1234.56)).toBe("1235");
     expect(formatCalendarCellAmount(12345.67)).toBe("12.3k");
     expect(formatCalendarCellAmount(1234.56)).not.toContain("SGD");
+  });
+});
+
+describe("frequent expense templates", () => {
+  it("ranks by frequency and uses recency to break ties", () => {
+    const expenses = [
+      makeExpense("cat_transport", "2026-07-01", 2, "Bus"),
+      makeExpense("cat_food_drinks", "2026-07-02", 5, "Yakun"),
+      makeExpense("cat_transport", "2026-07-03", 2, "Bus"),
+      makeExpense("cat_groceries", "2026-07-04", 12, "NTUC"),
+      makeExpense("cat_food_drinks", "2026-07-05", 5.2, "Yakun"),
+      makeExpense("cat_transport", "2026-07-06", 2.1, "Bus"),
+      makeExpense("cat_shopping", "2026-07-07", 8, "Popular")
+    ];
+    const templates = getFrequentExpenseTemplates(expenses);
+    expect(templates.map((expense) => expense.title)).toEqual(["Bus", "Yakun", "Popular"]);
+    expect(templates[0].amount).toBe(2.1);
   });
 });
 
@@ -469,30 +494,37 @@ describe("recurring rules", () => {
     expect(editedRule.nextDate).toBe("2026-08-05");
   });
 
-  it("resolves edited past start dates without backfilling old bill reminders", () => {
-    const data = createDefaultProfileData();
-    const rule = {
-      id: "rule_1",
-      title: "Phone bill",
-      amount: 20,
-      currency: "SGD",
-      categoryId: "cat_bills",
-      remark: null,
-      paymentMethod: "Credit Card",
-      cadence: "monthly" as const,
-      dayOfMonth: 5,
-      startDate: "2026-06-05",
-      nextDate: "2026-06-05",
-      isActive: true,
-      createdAt: "2026-07-01T00:00:00Z",
-      updatedAt: "2026-07-01T00:00:00Z"
-    };
-    const resolved = resolveRecurringRuleNextDate(rule, [], "2026-12-09");
-    expect(resolved.nextDate).toBe("2027-01-05");
+  it("shows every unresolved occurrence from a past start date", () => {
+    const rule = makeRecurringRule({ startDate: "2026-06-03", nextDate: "2026-06-03", dayOfMonth: 3 });
+    const dueDates = getDueRecurringOccurrences([rule], [], "2026-07-10").map((occurrence) => occurrence.date);
+    expect(dueDates).toEqual(["2026-06-03", "2026-07-03"]);
+    expect(resolveRecurringRuleNextDate(rule, [], "2026-07-10").nextDate).toBe("2026-06-03");
+  });
 
-    const result = materializeDueRecurring({ ...data, recurringRules: [resolved] }, "2026-12-09");
-    expect(result.created).toHaveLength(0);
-    expect(result.data.recurringRules[0].nextDate).toBe("2027-01-05");
+  it("suppresses exact recorded dates after a start-date edit", () => {
+    const existingJuly = { ...makeExpense("cat_bills", "2026-07-05", 20, "Phone bill"), paymentMethod: "Credit Card" };
+    const julyRule = makeRecurringRule({ startDate: "2026-07-05", nextDate: "2026-07-05", dayOfMonth: 5 });
+    expect(getDueRecurringOccurrences([julyRule], [existingJuly], "2026-07-10")).toHaveLength(0);
+    expect(resolveRecurringRuleNextDate(julyRule, [existingJuly], "2026-07-10").nextDate).toBe("2026-08-05");
+
+    const juneRule = { ...julyRule, startDate: "2026-06-05", nextDate: "2026-06-05", discardedDates: [] };
+    const dueDates = getDueRecurringOccurrences([juneRule], [existingJuly], "2026-07-10").map((occurrence) => occurrence.date);
+    expect(dueDates).toEqual(["2026-06-05"]);
+    expect(resolveRecurringRuleNextDate(juneRule, [existingJuly], "2026-07-10").nextDate).toBe("2026-06-05");
+  });
+
+  it("keeps discarded occurrences dismissed and advances after recording", () => {
+    const data = createDefaultProfileData();
+    const rule = makeRecurringRule({ startDate: "2026-06-03", nextDate: "2026-06-03", dayOfMonth: 3 });
+    const withRule = { ...data, recurringRules: [rule] };
+
+    const discarded = discardRecurringOccurrence(withRule, rule.id, "2026-06-03", "2026-07-10");
+    expect(discarded.recurringRules[0].discardedDates).toEqual(["2026-06-03"]);
+    expect(getDueRecurringOccurrences(discarded.recurringRules, discarded.expenses, "2026-07-10").map((item) => item.date)).toEqual(["2026-07-03"]);
+
+    const recorded = recordRecurringOccurrence(discarded, rule.id, "2026-07-03", "2026-07-10");
+    expect(recorded.created?.date).toBe("2026-07-03");
+    expect(recorded.data.recurringRules[0].nextDate).toBe("2026-08-03");
   });
 
   it("keeps future starts future and skips exact records due today", () => {
@@ -544,6 +576,7 @@ describe("recurring rules", () => {
     );
     expect(normalized[0].startDate).toBe("2026-07-05");
     expect(normalized[0].nextDate).toBe("2026-08-05");
+    expect(normalized[0].discardedDates).toEqual([]);
   });
 
   it("supports daily and annual recurring cadence", () => {

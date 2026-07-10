@@ -60,6 +60,7 @@ export interface RecurringRule {
   dayOfMonth?: number | null;
   startDate: string;
   nextDate: string;
+  discardedDates?: string[];
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

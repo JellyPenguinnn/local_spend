@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import { CalendarDays, History, Plus } from "lucide-react";
+import { CalendarDays, Plus, Repeat2, Wand2 } from "lucide-react";
 import { getDailyTotals } from "../lib/analytics";
 import { fallbackCategoryId } from "../lib/categories";
 import { formatLocalIsoDate, parseLocalDate } from "../lib/date";
 import { formatMoney } from "../lib/money";
-import { materializeDueRecurring } from "../lib/recurring";
+import { discardRecurringOccurrence, getDueRecurringOccurrences, recordRecurringOccurrence } from "../lib/recurring";
+import { getFrequentExpenseTemplates } from "../lib/expenseTemplates";
 import { parseExpenseWithAiOrLocal, type AiSecretStore } from "../lib/ai/providers";
 import type { Expense, ExpenseDraft, ProfileData, RecurringCadence } from "../lib/types";
 import { EmptyState } from "../components/EmptyState";
@@ -37,17 +38,18 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
   const [quickMessage, setQuickMessage] = useState("");
   const [isParsing, setIsParsing] = useState(false);
   const [isEntryOpen, setIsEntryOpen] = useState(false);
+  const [isNaturalEntryOpen, setIsNaturalEntryOpen] = useState(false);
+  const [pendingDiscardOccurrenceId, setPendingDiscardOccurrenceId] = useState<string | null>(null);
   const todayExpenses = useMemo(
     () => data.expenses.filter((expense) => expense.date === today).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [data.expenses, today]
   );
   const todayTotal = getDailyTotals(todayExpenses)[today] ?? 0;
-  const recentTemplates = useMemo(() => getRecentTemplates(data.expenses), [data.expenses]);
-  const dueRules = useMemo(
-    () => data.recurringRules.filter((rule) => rule.isActive && rule.nextDate <= today).sort((a, b) => a.nextDate.localeCompare(b.nextDate) || b.amount - a.amount),
-    [data.recurringRules, today]
+  const frequentTemplates = useMemo(() => getFrequentExpenseTemplates(data.expenses), [data.expenses]);
+  const dueOccurrences = useMemo(
+    () => getDueRecurringOccurrences(data.recurringRules, data.expenses, today),
+    [data.expenses, data.recurringRules, today]
   );
-  const dueActionLabel = dueRules.length === 1 ? "Record bill" : "Record bills";
 
   async function parseQuickAdd() {
     if (!quickText.trim()) {
@@ -71,21 +73,29 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
         paymentMethod: parsed.paymentMethod ?? data.appSettings.paymentMethods[0] ?? "Other"
       });
       setIsEntryOpen(true);
+      setIsNaturalEntryOpen(false);
       setQuickMessage(parsed.source === "ai" ? "AI suggestion ready. Check it before saving." : "Draft ready. Check it before saving.");
     } finally {
       setIsParsing(false);
     }
   }
 
-  async function applyRecurring() {
-    const result = materializeDueRecurring(data, today);
+  async function recordBill(ruleId: string, occurrenceDate: string) {
+    const result = recordRecurringOccurrence(data, ruleId, occurrenceDate, today);
     await saveData(result.data);
+    setPendingDiscardOccurrenceId(null);
+  }
+
+  async function discardBill(ruleId: string, occurrenceDate: string) {
+    await saveData(discardRecurringOccurrence(data, ruleId, occurrenceDate, today));
+    setPendingDiscardOccurrenceId(null);
   }
 
   function openEntry(expense?: Expense) {
     setEditingExpense(expense ?? null);
     setQuickDraft(undefined);
     setQuickMessage("");
+    setIsNaturalEntryOpen(false);
     setIsEntryOpen(true);
   }
 
@@ -94,6 +104,7 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
     setQuickDraft(undefined);
     setQuickText("");
     setQuickMessage("");
+    setIsNaturalEntryOpen(false);
     setIsEntryOpen(false);
   }
 
@@ -108,7 +119,7 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
       remark: "",
       paymentMethod: expense.paymentMethod ?? data.appSettings.paymentMethods[0] ?? "Other"
     });
-    setQuickMessage("Recent spend ready. Check it before saving.");
+    setQuickMessage("Frequent spend ready. Check it before saving.");
   }
 
   return (
@@ -126,30 +137,49 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
         </div>
       </section>
 
-      {dueRules.length > 0 && (
+      {dueOccurrences.length > 0 && (
         <section className="panel upcoming-panel">
           <div className="section-heading compact-heading">
-            <div>
-              <p className="eyebrow">Due bills</p>
-            </div>
-            <button type="button" className="secondary-button due-bills-action" onClick={() => void applyRecurring()}>
-              {dueActionLabel}
-            </button>
+            <p className="eyebrow">Due bills</p>
+            <span className="muted small">{dueOccurrences.length} pending</span>
           </div>
           <div className="upcoming-list">
-            {dueRules.map((item) => {
+            {dueOccurrences.map((occurrence) => {
+              const item = occurrence.rule;
               const category = data.categories.find((entry) => entry.id === item.categoryId);
+              const isDiscarding = pendingDiscardOccurrenceId === occurrence.id;
               return (
-                <article className="upcoming-row" key={item.id}>
+                <article className="upcoming-row due-occurrence-row" key={occurrence.id}>
                   <CategoryChip category={category} label="" compact />
                   <div>
                     <strong>{item.title}</strong>
                     <span>
                       {category?.name ?? "Category"} · {item.paymentMethod || "Payment"} · {CADENCE_LABELS[item.cadence]}
                     </span>
-                    <span>{item.nextDate}</span>
+                    <span>Due {formatDateLabel(occurrence.date)}</span>
                   </div>
                   <strong>{formatMoney(item.amount, item.currency || data.appSettings.currency)}</strong>
+                  <div className="due-occurrence-actions">
+                    {isDiscarding ? (
+                      <>
+                        <button className="secondary-button" type="button" onClick={() => setPendingDiscardOccurrenceId(null)}>
+                          Cancel
+                        </button>
+                        <button className="secondary-button danger-button" type="button" onClick={() => void discardBill(item.id, occurrence.date)}>
+                          Discard
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button className="secondary-button" type="button" onClick={() => setPendingDiscardOccurrenceId(occurrence.id)}>
+                          Discard
+                        </button>
+                        <button className="primary-button" type="button" onClick={() => void recordBill(item.id, occurrence.date)}>
+                          Record
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </article>
               );
             })}
@@ -164,6 +194,15 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
             Cancel
           </button>
           {!editingExpense && (
+            <div className="entry-method-row">
+              {frequentTemplates.length > 0 && <p className="eyebrow">Frequent</p>}
+              <button className="link-button natural-entry-toggle" type="button" onClick={() => setIsNaturalEntryOpen((value) => !value)}>
+                <Wand2 size={15} />
+                {isNaturalEntryOpen ? "Manual entry" : "Natural entry"}
+              </button>
+            </div>
+          )}
+          {!editingExpense && isNaturalEntryOpen && (
             <NaturalQuickAdd
               value={quickText}
               message={quickMessage}
@@ -174,15 +213,14 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
               onDraft={() => void parseQuickAdd()}
             />
           )}
-          {!editingExpense && !quickDraft && !quickText && recentTemplates.length > 0 && (
-            <div className="recent-spend-shortcuts" aria-label="Recent spending shortcuts">
-              <p className="eyebrow">Recent</p>
+          {!editingExpense && !isNaturalEntryOpen && !quickDraft && frequentTemplates.length > 0 && (
+            <div className="recent-spend-shortcuts" aria-label="Frequent spending shortcuts">
               <div>
-                {recentTemplates.map((expense) => {
+                {frequentTemplates.map((expense) => {
                   const category = data.categories.find((item) => item.id === expense.categoryId);
                   return (
                     <button type="button" key={expense.id} onClick={() => applyRecentTemplate(expense)}>
-                      <History size={14} />
+                      <Repeat2 size={14} />
                       <span>{expense.title || category?.name || "Spend"}</span>
                       <strong>{formatMoney(expense.amount, expense.currency || data.appSettings.currency)}</strong>
                     </button>
@@ -201,6 +239,7 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
             editingExpense={editingExpense}
             hideDate
             hideTitleRow
+            autoFocusAmount={!isNaturalEntryOpen}
             saveLabel="Save"
             onCancelEdit={closeEntry}
             onSave={(expense) => {
@@ -244,18 +283,6 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
   );
 }
 
-function getRecentTemplates(expenses: Expense[]): Expense[] {
-  const seen = new Set<string>();
-  const templates: Expense[] = [];
-  const sorted = [...expenses].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-
-  for (const expense of sorted) {
-    const key = `${expense.title?.trim().toLowerCase() || expense.categoryId}|${expense.categoryId}|${expense.paymentMethod ?? ""}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    templates.push(expense);
-    if (templates.length === 3) break;
-  }
-
-  return templates;
+function formatDateLabel(date: string): string {
+  return new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short", year: "numeric" }).format(parseLocalDate(date));
 }

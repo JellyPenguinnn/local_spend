@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, Check, RotateCcw } from "lucide-react";
 import { hasDuplicateExpense, suggestFromExpenseHistory } from "../lib/analytics";
 import { suggestCategoryLocal } from "../lib/categories";
@@ -17,6 +17,7 @@ interface ExpenseFormProps {
   compact?: boolean;
   hideDate?: boolean;
   hideTitleRow?: boolean;
+  autoFocusAmount?: boolean;
   saveLabel?: string;
   onSave: (expense: Expense, mode: "add" | "edit") => void;
   onCancelEdit?: () => void;
@@ -32,10 +33,12 @@ export function ExpenseForm({
   compact = false,
   hideDate = false,
   hideTitleRow = false,
+  autoFocusAmount = false,
   saveLabel,
   onSave,
   onCancelEdit
 }: ExpenseFormProps) {
+  const amountInputRef = useRef<HTMLInputElement>(null);
   const defaultCategoryId = categories[0]?.id ?? "";
   const [draft, setDraft] = useState<ExpenseDraft>(() => ({
     amount: "",
@@ -82,6 +85,12 @@ export function ExpenseForm({
       }));
     }
   }, [defaultDate, editingExpense, initialDraft]);
+
+  useEffect(() => {
+    if (autoFocusAmount && !editingExpense) {
+      amountInputRef.current?.focus({ preventScroll: true });
+    }
+  }, [autoFocusAmount, editingExpense]);
 
   function update<K extends keyof ExpenseDraft>(key: K, value: ExpenseDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -177,6 +186,8 @@ export function ExpenseForm({
         <label className="amount-field">
           <span>Amount</span>
           <input
+            ref={amountInputRef}
+            autoFocus={autoFocusAmount && !editingExpense}
             inputMode="decimal"
             value={draft.amount}
             placeholder="0.00"

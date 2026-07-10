@@ -31,3 +31,7 @@ LocalSpend keeps the Tauri macOS app, but the frontend is now mobile-first and i
 ## Frontend Size
 
 The category donut chart is lazy-loaded so the daily tracker does not load Recharts on first open. This keeps the main web bundle smaller for iPhone use while preserving the Summary chart.
+
+## Recurring Bill Occurrences
+
+Recurring reminders are derived from each rule's start date and cadence, not only from a mutable next-due pointer. Every scheduled date is handled independently: an exact matching expense records it, while a user discard stores that date in the rule's `discardedDates` list. This prevents duplicate reminders, preserves missed-cycle reminders after schedule edits, and keeps later occurrences independent.

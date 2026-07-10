@@ -76,6 +76,8 @@ pub struct RecurringRule {
     day_of_month: Option<i64>,
     start_date: String,
     next_date: String,
+    #[serde(default)]
+    discarded_dates: Vec<String>,
     is_active: bool,
     created_at: String,
     updated_at: String,
@@ -469,6 +471,7 @@ fn initialize_database(conn: &Connection) -> CmdResult<()> {
           day_of_month INTEGER,
           start_date TEXT,
           next_date TEXT NOT NULL,
+          discarded_dates TEXT NOT NULL DEFAULT '[]',
           is_active INTEGER NOT NULL DEFAULT 1,
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL,
@@ -496,6 +499,7 @@ fn initialize_database(conn: &Connection) -> CmdResult<()> {
     )
     .map_err(|err| format!("Could not initialize database: {err}"))?;
     ensure_recurring_start_date(conn)?;
+    ensure_recurring_discarded_dates(conn)?;
 
     let category_count: i64 = conn
         .query_row("SELECT COUNT(*) FROM categories", [], |row| row.get(0))
@@ -566,6 +570,31 @@ fn ensure_recurring_start_date(conn: &Connection) -> CmdResult<()> {
         [],
     )
     .map_err(|err| format!("Could not backfill recurring rule start dates: {err}"))?;
+    Ok(())
+}
+
+fn ensure_recurring_discarded_dates(conn: &Connection) -> CmdResult<()> {
+    let mut stmt = conn
+        .prepare("PRAGMA table_info(recurring_rules)")
+        .map_err(|err| format!("Could not inspect recurring rules schema: {err}"))?;
+    let columns = stmt
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|err| format!("Could not read recurring rules schema: {err}"))?;
+    let mut has_discarded_dates = false;
+    for column in columns {
+        if column.map_err(|err| format!("Could not map recurring rules schema: {err}"))? == "discarded_dates" {
+            has_discarded_dates = true;
+            break;
+        }
+    }
+    drop(stmt);
+    if !has_discarded_dates {
+        conn.execute(
+            "ALTER TABLE recurring_rules ADD COLUMN discarded_dates TEXT NOT NULL DEFAULT '[]'",
+            [],
+        )
+        .map_err(|err| format!("Could not add recurring rule discarded dates: {err}"))?;
+    }
     Ok(())
 }
 
@@ -662,9 +691,11 @@ fn persist_profile_data(conn: &mut Connection, data: &ProfileData) -> CmdResult<
     }
 
     for rule in &data.recurring_rules {
+        let discarded_dates = serde_json::to_string(&rule.discarded_dates)
+            .map_err(|err| format!("Could not serialize recurring rule discarded dates: {err}"))?;
         tx.execute(
-            "INSERT INTO recurring_rules(id, title, amount, currency, category_id, remark, payment_method, cadence, day_of_month, start_date, next_date, is_active, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+            "INSERT INTO recurring_rules(id, title, amount, currency, category_id, remark, payment_method, cadence, day_of_month, start_date, next_date, discarded_dates, is_active, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
             params![
                 rule.id,
                 rule.title,
@@ -677,6 +708,7 @@ fn persist_profile_data(conn: &mut Connection, data: &ProfileData) -> CmdResult<
                 rule.day_of_month,
                 rule.start_date,
                 rule.next_date,
+                discarded_dates,
                 if rule.is_active { 1 } else { 0 },
                 rule.created_at,
                 rule.updated_at
@@ -761,12 +793,13 @@ fn read_budgets(conn: &Connection) -> CmdResult<Vec<Budget>> {
 fn read_recurring_rules(conn: &Connection) -> CmdResult<Vec<RecurringRule>> {
     let mut stmt = conn
         .prepare(
-            "SELECT id, title, amount, currency, category_id, remark, payment_method, cadence, day_of_month, COALESCE(start_date, next_date), next_date, is_active, created_at, updated_at
+            "SELECT id, title, amount, currency, category_id, remark, payment_method, cadence, day_of_month, COALESCE(start_date, next_date), next_date, discarded_dates, is_active, created_at, updated_at
              FROM recurring_rules ORDER BY next_date, title",
         )
         .map_err(|err| format!("Could not prepare recurring rules query: {err}"))?;
     let rows = stmt
         .query_map([], |row| {
+            let discarded_dates_json: String = row.get(11)?;
             Ok(RecurringRule {
                 id: row.get(0)?,
                 title: row.get(1)?,
@@ -779,9 +812,10 @@ fn read_recurring_rules(conn: &Connection) -> CmdResult<Vec<RecurringRule>> {
                 day_of_month: row.get(8)?,
                 start_date: row.get(9)?,
                 next_date: row.get(10)?,
-                is_active: row.get::<_, i64>(11)? != 0,
-                created_at: row.get(12)?,
-                updated_at: row.get(13)?,
+                discarded_dates: serde_json::from_str(&discarded_dates_json).unwrap_or_default(),
+                is_active: row.get::<_, i64>(12)? != 0,
+                created_at: row.get(13)?,
+                updated_at: row.get(14)?,
             })
         })
         .map_err(|err| format!("Could not read recurring rules: {err}"))?;
@@ -1104,10 +1138,28 @@ mod tests {
             created_at: "2026-07-07T00:00:00Z".to_string(),
             updated_at: "2026-07-07T00:00:00Z".to_string(),
         });
+        data.recurring_rules.push(RecurringRule {
+            id: "rule_test".to_string(),
+            title: "Phone bill".to_string(),
+            amount: 20.0,
+            currency: "SGD".to_string(),
+            category_id: data.categories[0].id.clone(),
+            remark: None,
+            payment_method: Some("PayNow".to_string()),
+            cadence: "monthly".to_string(),
+            day_of_month: Some(5),
+            start_date: "2026-06-05".to_string(),
+            next_date: "2026-07-05".to_string(),
+            discarded_dates: vec!["2026-06-05".to_string()],
+            is_active: true,
+            created_at: "2026-06-01T00:00:00Z".to_string(),
+            updated_at: "2026-07-07T00:00:00Z".to_string(),
+        });
         persist_profile_data(&mut conn, &data).expect("save data");
         let loaded = load_profile_data(&conn).expect("reload data");
         assert_eq!(loaded.expenses.len(), 1);
         assert_eq!(loaded.expenses[0].title.as_deref(), Some("Lunch"));
         assert_eq!(loaded.categories.len(), 14);
+        assert_eq!(loaded.recurring_rules[0].discarded_dates, vec!["2026-06-05"]);
     }
 }

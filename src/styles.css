@@ -942,6 +942,27 @@ h3 {
   margin-bottom: 0.75rem;
 }
 
+.entry-method-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 30px;
+  margin-bottom: 0.45rem;
+}
+
+.entry-method-row .eyebrow {
+  margin: 0;
+}
+
+.natural-entry-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
 .form-note {
   margin: 0;
   color: var(--muted);
@@ -1184,6 +1205,20 @@ h3 {
   min-height: 34px;
   padding: 0.5rem 0.68rem;
   white-space: nowrap;
+}
+
+.due-occurrence-actions {
+  grid-column: 2 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.due-occurrence-actions .primary-button,
+.due-occurrence-actions .secondary-button {
+  min-height: 34px;
+  min-width: 78px;
+  padding: 0.45rem 0.65rem;
 }
 
 .upcoming-list {
@@ -3459,6 +3494,12 @@ h3 {
     grid-column: 2;
     color: var(--muted);
     font-size: 0.9rem;
+  }
+
+  .due-occurrence-actions {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .expense-row {
