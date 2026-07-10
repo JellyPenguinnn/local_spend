@@ -1,0 +1,18 @@
+{
+  "name": "LocalSpend",
+  "short_name": "LocalSpend",
+  "description": "Private local spending tracker for quick daily entry.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#f3dfb6",
+  "theme_color": "#f3dfb6",
+  "icons": [
+    {
+      "src": "localspend-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+# TASKS
+
+## Completed
+
+- Read and obeyed `AGENTS.md`.
+- Researched current Tauri, SQLite, charting, AI provider, key storage, and macOS packaging guidance.
+- Created core project documentation.
+- Scaffolded Tauri 2, React, TypeScript, Vite, SQLite-backed architecture.
+- Implemented local profile design, spending tracker UX, calendar, summary, settings, appearance controls, import/export, backups, recurring rules, and AI settings.
+- Polished the user-facing flow from screenshot feedback: quieter Today/Summary headers, clearer month picker, simpler Settings tabs, clearer Categories purpose, theme accent picker, and better natural-language draft parsing.
+- Added an iPhone-focused responsive/PWA pass: bottom mobile navigation, custom month/year selector, inline delete confirmation, cleaner Summary/Settings layouts, web app manifest, service worker, and lazy-loaded Summary chart.
+- Simplified the Today first impression for phone use: Today now opens to total plus entries, and the NLP/manual form appears only after Add or Edit.
+- Removed Records from the main mobile navigation to keep the daily spending flow focused on Today, Calendar, Summary, and Settings.
+- Improved Calendar and Summary polish: selected dates now open a focused day sub-screen with Back and one Add spend action, month selection uses year plus month grids, mobile add forms use one-column fields, and Summary shows budget above comments.
+- Fixed iPhone date input alignment by constraining form controls and grid labels so native date controls stay inside the add-spending card.
+- Replaced the visible expense date input with an aligned custom date display over the native date picker, and pinned mobile preview to port 4173 for a stable iPhone URL.
+- Added premium planning upgrades: safe-to-spend, left-per-day pace, upcoming recurring bills, monthly review cards, local merchant memory suggestions, category chips/icons, save feedback, and restrained screen/form motion.
+- Reworked Summary mobile sizing so the iPhone layout is compact, contained, and review-first with smaller chart height and swipeable insight cards.
+- Cleaned up iPhone polish issues: Today add form is now an opaque shorter sheet with backdrop, Calendar selected-day title is smaller, and Summary now shows Distribution first, then Budget, then Insight cards without duplicate metric boxes.
+- Finalized the latest iPhone flow pass: Today Add Spend uses the same simple in-page form behavior as Calendar, Calendar selected-day Add supports natural-language draft fill, selected-day date titles are reduced, and Summary insight cards are stacked as clear key notes instead of a confusing horizontal swipe rail.
+- Tightened the Today/Calendar/Summary consistency pass: Today now shows a fixed today date pill and hides date editing, Calendar selected-day add no longer repeats empty-day totals inside the form, Summary uses the same elevated month picker behavior, and the three top amount panels share matching mobile sizing.
+- Simplified the latest iPhone Summary and Today feedback: removed the Today left-this-month card, restored the visible Add action after entries exist, made the Summary month picker more touch-reliable, moved Monthly Budget above Distribution, collapsed budget editing behind Set/Reset budget, disabled the Monthly Review box for now, and constrained the donut chart inside its card.
+- Refined the final Today/Summary polish: replaced the boxed Today form close with a quiet Cancel action, shortened Summary budget reset copy, made donut slices selectable, added a focused selected-category summary, and compressed category rows into a clean amount-plus-percent line.
+- Removed redundant Today add-form headings, moved Cancel to a full-width bottom action, placed Summary budget Reset in the card corner, removed the overlapping donut tooltip, and replaced duplicate distribution rows with a compact side legend that shows each category color, amount, and percentage.
+- Tightened the latest phone pass: Today entries hide redundant dates and use compact category/payment/remark lines, Today form Cancel moved above the NLP input for easier reach, Summary budget now focuses on amount/percent left plus per-day estimate, and Distribution stacks the donut above a compact full breakdown legend with softer selected-slice contrast.
+- Removed redundant Today edit form title/reset icon, shortened Today form save label to Save, simplified Calendar selected-day totals copy, removed Summary per-day helper text, and increased Distribution selected-state contrast with a darker selected legend row and lighter unselected donut slices.
+- Removed hero subtitles from Today, Calendar, and Summary; renamed Today timeline label to Entries; made Calendar selected-day totals easier to scan; changed Calendar form close copy to Cancel; and aligned selected-day entry rows/form labels with the compact Today pattern.
+- Simplified repeated section headings: Today now uses one `Today’s entries` label, and Calendar selected-day/add/edit panels use a single clear heading such as `Total spending`, `Add spending`, or `Edit spending`.
+- Added a premium iOS 26-inspired visual pass: frosted material surfaces, richer but readable depth, polished header/profile/navigation controls, tactile rows/buttons, upgraded calendar cells, and clearer selected-state contrast in the Summary donut.
+- Corrected the premium visual pass after iPhone review: reduced overdone glass/noise, restored a cleaner high-class look, fixed the mobile tab bar safe-area fallback so it stays at the bottom, and removed sticky touch-hover borders from entry rows.
+- Simplified Settings for personal use: removed visible Profile/Data/AI tabs, split Settings into Appearance, Categories, Payments, Bills, and Targets, added popular currency selection, improved accent color/category/payment management, separated bills from monthly targets, and changed Calendar day intensity to a clearer monotone tint.
+- Refined Settings again: removed the redundant Targets tab, moved Bills to the second tab, added simple accent color presets, and made Categories editable on demand so Categories and Payments read as clean preference lists instead of crowded admin tables.
+- Made Settings add flows progressive: Bills, Categories, and Payments now show a single Add box first and reveal their forms only after tapping Add; success/remove messages no longer appear as bottom toasts.
+- Tightened Settings safety and clarity: bill/payment/category removals now require confirmation, bill/category/payment amounts display with the selected currency, unused default categories can be edited or removed, and the accent presets now use calmer premium tones.
+- Refined bills UX: bill rows now keep details on the left with the amount top-right, Settings delete confirmations use the same inline Cancel/Delete layer as expense rows, and Today shows only due bills with a compact Add action so future bills do not linger confusingly after recording.
+- Simplified the latest Settings and Today bill polish: Today due bills now use a clear compact `Record bill(s)` action, bill title and amount align at the top, and Categories/Payments are compact add-or-remove lists without usage totals or category edit controls.
+- Replaced visible cartoon theme choices with custom local wallpaper support: users can import compressed wallpapers, select a clean or saved background, tune stronger transparency, use light/dark mode, remove saved images, and keep storage controlled with a 5-image profile cap.
+- Refined Settings and entry form focus: bill rows can now be edited, Categories/Payments hide delete controls behind an edit mode, Settings section titles use a cleaner underline, Bills shows a total count, and Today/Calendar add/edit forms no longer show existing entries underneath.
+- Tightened Appearance and Bills polish: Mode label now matches other field labels, wallpaper visibility sits above import, import is a full-width dashed action, wallpaper removal requires inline confirmation, and Bill add/edit hides the existing bill list.
+- Simplified Settings headers and visual rhythm: removed Settings section title bars, moved counts/actions to the top-right control row, split Appearance into separate Currency/Mode/Accent/Wallpaper cards, and standardized entry metadata separators with middle dots.
+- Refined Settings subscription management: Bills now use a Today-entry-like row layout with compact add/edit actions, bill forms use full-width Cancel/Save controls, daily/weekly/monthly/annual cadence options are supported, and Category/Payment add boxes moved below their lists.
+- Aligned the latest Settings controls: bill/category/payment save buttons now use the same check-plus-Save language, Category/Payment add forms stack full-width Save and Cancel actions, category color input height matches the text fields, and Calendar selected-day Add uses a simple plus icon.
+- Improved Appearance customization and bill row polish: bill amounts now share the same title line alignment as Today entries, Category/Payment add forms use plain Save labels, wallpaper counts are unboxed, and accent colors now support a saved color palette with add/remove controls.
+- Refined the saved color and wallpaper UX: accent color Save now sits beside the color picker, max-color warnings stay inside the accent card, wallpaper count text is removed, wallpaper max warnings appear only when the import limit is reached, and subscription row spacing/actions better match Today entries.
+- Fixed the latest bill and appearance issues: saved accent color removal now uses an inline confirmation layer, the max saved-color warning is shorter, subscription rows use the same icon/main/amount/action structure as Today entries, bill start date uses the stable custom date control, and duplicate recurring bills now advance correctly when recorded.
+- Clarified recurring bill duplicate handling: exact matching bill expenses now count as already recorded, bill forms show an inline already-recorded note, saving an already-recorded bill advances to the next unrecorded cycle, and Today's record-bill action now clears duplicate-only due reminders.
+- Made saved accent colors safer to use: color swatches are now selection-only with larger tap targets, and removing a saved color uses a separate Remove selected action plus confirmation.
+- Cleaned the latest Settings polish: bills now use clearer `Next due`/`Due` wording, subscription rows are visually closer to Today entry rows, and the accent card is organized as current color, save state, then saved swatches.
+- Corrected bill scheduling semantics: bill creation uses a user-editable `Start date`, recurring rules store both original start date and internal next due date, old bills infer start date from exact matching expenses when possible, and already-recorded start dates show a clear warning.
+- Fixed Calendar day amount overflow: month grid cells now use compact currency-free totals while selected-day details still show the full currency amount.
+- Refined the latest recurrence and settings polish: bill start dates are editable again and recalculate next due, saved accent colors separate selection from removal, calendar day totals stay precise until compact notation is needed, and subscription rows reuse the Today entry rhythm.
+- Adjusted the accent color card into a true edit mode: Save and removable swatch X controls only appear after tapping Edit, while normal swatches remain selection-only.
+- Tuned calendar day totals so amounts use smaller grey tabular text, preserve cents below 1,000, round 4-digit totals, and compact only larger totals.
+- Finalized recurring bill logic with tests for forward schedule resolution, duplicate-record skipping, inactive rules, future starts, month-end date clamping, and one-occurrence-per-confirmation recording.
+- Added Summary category drill-down: category boxes below the donut open a focused monthly list with each spend's date, title, and amount.
+- Improved natural-language expense drafting with weighted local category rules, stronger Singapore merchant/payment recognition, `Other` fallback instead of default Food, and user-facing `Description` labels for spending and bill forms.
+- Finalized the NLP approach from research: deterministic slot extraction, Singapore-specific aliases, weighted category rules, and active-profile history override for weak guesses.
+- Added unit tests for core local logic.
+- Verified lint, TypeScript/web build, JS tests, Rust SQLite tests, and Tauri `.app` build.
+
+## Follow-Up Polish
+
+- Add signed/notarized macOS release instructions once an Apple Developer account is available.
+- Add Playwright visual smoke tests if a browser automation setup is desired later.
