@@ -1,21 +1,149 @@
 # LocalSpend
 
-LocalSpend is a local-first spending tracker for quick daily entry, monthly calendar review, category summaries, budgets, CSV import/export, JSON backup/restore, and optional privacy-conscious AI helpers. It runs as a macOS Tauri app and has a mobile-first web/PWA layout for iPhone personal use.
+[![Deploy PWA to GitHub Pages](https://github.com/JellyPenguinnn/local_spend/actions/workflows/pages.yml/badge.svg)](https://github.com/JellyPenguinnn/local_spend/actions/workflows/pages.yml)
 
-It is intentionally not a SaaS product: there are no cloud accounts, ads, subscriptions, telemetry, analytics, or payment features.
+LocalSpend is a local-first spending tracker for fast daily expense entry, monthly calendar review, category summaries, budgets, and recurring bill reminders. It is designed for personal use: clean, private, ad-free, and simple enough to use every day.
 
-## Privacy Model
+- Live PWA: [https://jellypenguinnn.github.io/local_spend/](https://jellypenguinnn.github.io/local_spend/)
+- Main platform: iPhone-friendly PWA and macOS Tauri desktop app
+- Default currency/date context: SGD and Singapore-style daily tracking
+- Current release tag: `v1.0.1`
 
-- Spending data is stored locally.
-- Each local profile has its own SQLite database file.
-- `profiles.json` stores only profile metadata such as display name and active profile id.
-- Import, export, backup, restore, AI requests, and reset actions operate only on the active profile.
-- AI is disabled by default. When enabled, monthly AI insights send monthly aggregates only, not the full transaction database.
-- API keys are saved through the desktop keyring command when running in Tauri. Browser-only dev fallback keeps keys in local browser storage for convenience and should not be used as secure storage.
+## Features
 
-## App Data Layout
+- **Today**: see today's total, add spending quickly, edit or delete entries, and record due bills.
+- **Natural quick add**: type spending naturally, such as `yakun 5.70 paynow`, then confirm the draft before saving.
+- **Calendar**: review monthly daily totals, select a day, and add or edit entries for that date.
+- **Summary**: view monthly total, budget progress, category donut chart, and category-level spending details.
+- **Bills**: create recurring bills or subscriptions with daily, weekly, monthly, or annual cadence.
+- **Settings**: manage currency, light/dark mode, accent colors, wallpapers, bills, categories, payment methods, and data controls.
+- **Data controls**: CSV import/export, JSON backup/restore, and safe local spending reset.
+- **Custom look**: choose calm accent colors and import up to 5 local wallpapers.
 
-On macOS the Tauri app stores data under the app data directory using:
+## Privacy
+
+LocalSpend is intentionally not a SaaS product.
+
+- No ads, telemetry, analytics, cloud login, subscription, or payment features.
+- Spending data stays local to the device/profile where it is entered.
+- The PWA stores data in that browser/PWA install. Each friend's phone has separate local data.
+- The macOS Tauri app stores each local profile in its own SQLite database.
+- Imported wallpapers are stored locally with the active profile.
+- Cloud AI provider settings are not exposed in the simplified v1 UI. Manual entry and local parsing work without cloud AI.
+
+See [docs/PRIVACY.md](docs/PRIVACY.md) for the fuller privacy model.
+
+## Tech Stack
+
+- Tauri 2 for the macOS desktop shell
+- React 19, TypeScript, and Vite for the frontend
+- SQLite for desktop local persistence
+- Browser local storage fallback for the hosted PWA
+- Recharts for the category donut chart
+- Vitest for unit tests
+- ESLint for linting
+- GitHub Actions and GitHub Pages for PWA deployment
+
+## Install On iPhone
+
+1. Open [https://jellypenguinnn.github.io/local_spend/](https://jellypenguinnn.github.io/local_spend/) in Safari.
+2. Tap Share.
+3. Tap **Add to Home Screen**.
+4. Open LocalSpend from the new Home Screen icon.
+
+The installed PWA does not depend on your Mac being awake. Data is stored locally on that iPhone, so deleting the PWA or clearing Safari website data can remove local data unless you export or back it up first.
+
+## Local Development
+
+### Prerequisites
+
+- Node.js 22 or newer
+- npm
+- Rust and Cargo for Tauri desktop development
+- macOS for macOS app or DMG builds
+
+### Setup
+
+```bash
+npm install
+```
+
+Run the browser dev app:
+
+```bash
+npm run dev
+```
+
+Run the Tauri desktop app:
+
+```bash
+npm run tauri:dev
+```
+
+Preview the production web build on your local network:
+
+```bash
+npm run build
+npm run preview:mobile
+```
+
+Do not add a trailing slash to the script name. Use `npm run preview:mobile`, not `npm run preview:mobile/`.
+
+## Scripts
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the Vite dev server on `127.0.0.1:1420`. |
+| `npm run tauri:dev` | Start the macOS Tauri app in development mode. |
+| `npm run build` | Typecheck and build the production web app into `dist/`. |
+| `npm run preview` | Preview the production build locally. |
+| `npm run preview:mobile` | Preview the production build on `0.0.0.0:4173` for iPhone testing on the same network. |
+| `npm run lint` | Run ESLint with zero warnings allowed. |
+| `npm run test` | Run Vitest unit tests. |
+| `npm run test:watch` | Run Vitest in watch mode. |
+
+## Build
+
+Build the web/PWA assets:
+
+```bash
+npm run build
+```
+
+Build a macOS app bundle:
+
+```bash
+npm run tauri -- build --bundles app
+```
+
+Build a macOS DMG:
+
+```bash
+npm run tauri -- build --bundles dmg
+```
+
+Unsigned local macOS builds may need Gatekeeper approval when shared. For wider macOS distribution, configure Apple Developer signing and notarization.
+
+## GitHub Pages Deployment
+
+The repository includes a GitHub Pages workflow at [.github/workflows/pages.yml](.github/workflows/pages.yml).
+
+On pushes to `main`, GitHub Actions:
+
+1. Installs dependencies with `npm ci`.
+2. Runs lint, tests, and production build.
+3. Builds with `VITE_BASE_PATH=/local_spend/`.
+4. Publishes `dist/` to GitHub Pages.
+
+GitHub Pages should use **GitHub Actions** as its source. After deployment, the PWA is available at:
+
+```text
+https://jellypenguinnn.github.io/local_spend/
+```
+
+## Data Model
+
+Desktop profile data follows this layout under the app data directory:
 
 ```text
 profiles.json
@@ -26,98 +154,65 @@ profiles/
     exports/
 ```
 
-For browser-only Vite development, LocalSpend uses a localStorage fallback so the UI remains testable without the desktop shell.
+`profiles.json` stores profile metadata only. Spending records live in the active profile database. In browser/PWA mode, the app uses browser storage instead of SQLite so it can run from GitHub Pages.
 
-## Setup
+## Data Controls
 
-Install dependencies:
+LocalSpend includes profile-scoped data controls in Settings:
 
-```bash
-npm install
-```
+- Export expenses as CSV.
+- Import expenses from CSV.
+- Create a JSON backup.
+- Restore from a JSON backup.
+- Reset local spending data after confirmation.
 
-Run the web dev UI:
+Back up before deleting the PWA, clearing Safari website data, resetting the app, or switching devices.
 
-```bash
-npm run dev
-```
-
-Preview the production web build on your local network for iPhone testing:
-
-```bash
-npm run build
-npm run preview:mobile
-```
-
-Open `http://172.20.10.2:4173/` in Safari on the iPhone when your Mac is on that local IP, then use Share -> Add to Home Screen. The preview command keeps port `4173` fixed; if your Mac gets a different local IP, reserve `172.20.10.2` in your router/hotspot or open the shown network URL instead. For friend testing, host the `dist/` folder on a private HTTPS URL and share that URL.
-
-### GitHub Pages PWA Hosting
-
-This repo includes a GitHub Pages workflow at `.github/workflows/pages.yml`.
-
-For the `JellyPenguinnn/local_spend` repository, pushes to `main` build the app with `VITE_BASE_PATH=/local_spend/` and publish the PWA from `dist/`.
-
-After the first successful workflow run, enable or confirm GitHub Pages in the repository settings with Source set to GitHub Actions. The public PWA URL should be:
+## Project Structure
 
 ```text
-https://jellypenguinnn.github.io/local_spend/
+.
+├── .github/workflows/      # GitHub Pages deployment
+├── docs/                   # Product, privacy, research, and decisions
+├── public/                 # PWA manifest and static assets
+├── src/
+│   ├── components/         # Shared UI components
+│   ├── lib/                # Dates, money, NLP parsing, data, recurring logic
+│   └── screens/            # Today, Calendar, Summary, Settings
+├── src-tauri/              # Tauri shell, Rust commands, SQLite persistence
+├── package.json
+└── README.md
 ```
 
-Open that URL on iPhone Safari, then use Share -> Add to Home Screen. The installed PWA does not depend on your Mac being awake. Each phone stores its own LocalSpend data locally in Safari/browser storage.
+## Quality Checks
 
-Run the Tauri desktop app:
-
-```bash
-npm run tauri:dev
-```
-
-Run checks:
+Run these before shipping changes:
 
 ```bash
 npm run lint
 npm run test
 npm run build
-cd src-tauri && cargo test
 ```
 
-Build a macOS app bundle:
+For desktop changes, also run:
 
 ```bash
-npm run tauri -- build --bundles app
+cd src-tauri
+cargo test
 ```
-
-Build a DMG for sharing outside the App Store:
-
-```bash
-npm run tauri -- build --bundles dmg
-```
-
-Unsigned local builds may need macOS Gatekeeper approval when shared. For wider sharing, sign and notarize the app with an Apple Developer account.
-
-## Main Workflows
-
-1. Create a local profile on first launch.
-2. Add spending from Today with amount, date, category, title, remark, and payment method.
-3. Review daily totals in Calendar.
-4. Review monthly totals, donut chart, budget progress, and concise comments in Summary.
-5. Use Settings for appearance, custom wallpapers, recurring bills, categories, and payment methods.
-
-## AI Provider Setup
-
-AI is optional and disabled by default. Supported provider modes:
-
-- `none`
-- `ollama-local`
-- `gemini`
-- `groq`
-- `openrouter`
-
-Use Settings to choose a provider, base URL, model, timeout, max tokens, and API key. Ollama defaults to `http://localhost:11434`; cloud providers require your own API key. Model names are editable because provider availability and free tiers change over time.
 
 ## Known Limitations
 
-- The browser-only fallback uses localStorage instead of SQLite and is for development convenience only.
-- The iPhone/PWA path stores data in that iPhone browser profile; it does not share the macOS SQLite profile database.
-- A native iOS build for friends requires Apple's iOS signing/TestFlight-style flow and is separate from the macOS DMG.
-- AI calls require network access for cloud providers or a running local Ollama server.
-- Builds are unsigned unless you configure Apple signing and notarization.
+- PWA data is local to the browser/PWA install and does not sync across phones.
+- Browser/PWA storage is not a replacement for encrypted cloud backup; use JSON backup/export for important data.
+- The hosted PWA uses browser storage, while the macOS Tauri app uses SQLite.
+- Native iOS App Store/TestFlight distribution is not part of v1.
+- Cloud AI provider setup is disabled in the simplified v1 UI; natural quick add uses local parsing.
+- No license file has been added yet.
+
+## Documentation
+
+- [Product Spec](docs/PRODUCT_SPEC.md)
+- [Privacy](docs/PRIVACY.md)
+- [Architecture Decisions](docs/DECISIONS.md)
+- [Research Notes](docs/research.md)
