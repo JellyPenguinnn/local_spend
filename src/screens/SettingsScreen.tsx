@@ -114,7 +114,6 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [isAddingPayment, setIsAddingPayment] = useState(false);
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
-  const [restoreDiscardedOnSave, setRestoreDiscardedOnSave] = useState(false);
   const [isEditingCategories, setIsEditingCategories] = useState(false);
   const [isEditingPayments, setIsEditingPayments] = useState(false);
   const [isEditingAccentPalette, setIsEditingAccentPalette] = useState(false);
@@ -160,7 +159,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
           dayOfMonth: Number(recurringDraft.startDate.slice(8, 10)),
           startDate: recurringDraft.startDate,
           nextDate: recurringDraft.startDate,
-          discardedDates: recurringScheduleChanged || restoreDiscardedOnSave ? [] : (editingRule?.discardedDates ?? []),
+          discardedDates: [],
           isActive: editingRule?.isActive ?? true,
           createdAt: editingRule?.createdAt ?? "",
           updatedAt: editingRule?.updatedAt ?? ""
@@ -444,7 +443,6 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
 
   function startAddingBill() {
     setEditingRuleId(null);
-    setRestoreDiscardedOnSave(false);
     resetRecurringDraft();
     setPendingDelete(null);
     setIsAddingBill(true);
@@ -453,7 +451,6 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
 
   function startEditingBill(rule: RecurringRule) {
     setEditingRuleId(rule.id);
-    setRestoreDiscardedOnSave(false);
     setRecurringDraft({
       title: rule.title,
       amount: String(rule.amount),
@@ -470,7 +467,6 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
   function closeBillForm() {
     setIsAddingBill(false);
     setEditingRuleId(null);
-    setRestoreDiscardedOnSave(false);
     resetRecurringDraft();
   }
 
@@ -495,7 +491,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
       dayOfMonth: Number(recurringDraft.startDate.slice(8, 10)),
       startDate: recurringDraft.startDate,
       nextDate: scheduleChanged ? recurringDraft.startDate : (existingRule?.nextDate ?? recurringDraft.startDate),
-      discardedDates: scheduleChanged || restoreDiscardedOnSave ? [] : (existingRule?.discardedDates ?? []),
+      discardedDates: [],
       isActive: existingRule?.isActive ?? true,
       createdAt: existingRule?.createdAt ?? timestamp,
       updatedAt: timestamp
@@ -871,21 +867,6 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
                 <p className="form-note warning bill-card-note">
                   Bill already recorded for this start date. Next due will be {formatDateForField(recurringDraftNextUnrecordedDate)}.
                 </p>
-              )}
-              {editingRule && (editingRule.discardedDates?.length ?? 0) > 0 && (
-                <div className="bill-discarded-control">
-                  <div>
-                    <strong>{editingRule.discardedDates?.length} discarded</strong>
-                    <span>{editingRule.discardedDates?.map(formatDateForField).join(" · ")}</span>
-                  </div>
-                  <button
-                    className={restoreDiscardedOnSave ? "secondary-button active" : "secondary-button"}
-                    type="button"
-                    onClick={() => setRestoreDiscardedOnSave((value) => !value)}
-                  >
-                    {restoreDiscardedOnSave ? "Restoring" : "Restore"}
-                  </button>
-                </div>
               )}
               <button className="primary-button bill-save-button" type="button" onClick={() => void saveRecurringRule()}>
                 <Check size={17} />

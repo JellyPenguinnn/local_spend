@@ -2698,38 +2698,6 @@ h3 {
   width: 100%;
 }
 
-.bill-discarded-control {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.65rem;
-  margin-top: 0.65rem;
-  border: 1px solid color-mix(in srgb, var(--warning) 26%, var(--border));
-  border-radius: var(--radius);
-  padding: 0.58rem;
-  background: color-mix(in srgb, var(--warning) 6%, var(--surface));
-}
-
-.bill-discarded-control div {
-  display: grid;
-  gap: 0.12rem;
-  min-width: 0;
-}
-
-.bill-discarded-control span {
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 0.78rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.bill-discarded-control .secondary-button.active {
-  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
-  background: var(--accent-wash-strong);
-  color: var(--accent);
-}
-
 .settings-form-actions {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

@@ -10,6 +10,7 @@ import { parseExpenseLocal } from "./ai/localParser";
 import { parseExpenseWithAiOrLocal } from "./ai/providers";
 import { parseJsonObject, validateAiCategoryJson, validateAiExpenseJson, validateAiInsightsJson } from "./ai/schema";
 import { formatCalendarCellAmount, formatMoney, parseMoney, roundMoney } from "./money";
+import { mostUsedPaymentMethod } from "./payments";
 import {
   advanceRecurringRulePastRecorded,
   discardRecurringOccurrence,
@@ -38,6 +39,19 @@ describe("money formatting and parsing", () => {
     expect(formatCalendarCellAmount(1234.56)).toBe("1235");
     expect(formatCalendarCellAmount(12345.67)).toBe("12.3k");
     expect(formatCalendarCellAmount(1234.56)).not.toContain("SGD");
+  });
+});
+
+describe("payment defaults", () => {
+  it("uses PayNow first, then the most-used available method", () => {
+    const methods = ["PayNow", "Apple Pay", "Cash"];
+    expect(mostUsedPaymentMethod([], methods)).toBe("PayNow");
+    const expenses = [
+      { ...makeExpense("cat_food_drinks", "2026-07-07", 4, "Kopi"), paymentMethod: "Apple Pay" },
+      { ...makeExpense("cat_transport", "2026-07-08", 2, "Bus"), paymentMethod: "Apple Pay" },
+      { ...makeExpense("cat_groceries", "2026-07-09", 12, "NTUC"), paymentMethod: "PayNow" }
+    ];
+    expect(mostUsedPaymentMethod(expenses, methods)).toBe("Apple Pay");
   });
 });
 

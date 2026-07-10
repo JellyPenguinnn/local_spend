@@ -5,6 +5,7 @@ import { suggestCategoryLocal } from "../lib/categories";
 import { parseLocalDate } from "../lib/date";
 import { createId, nowIso } from "../lib/defaults";
 import { parseMoney } from "../lib/money";
+import { mostUsedPaymentMethod } from "../lib/payments";
 import type { AppSettings, Category, Expense, ExpenseDraft } from "../lib/types";
 
 interface ExpenseFormProps {
@@ -41,14 +42,15 @@ export function ExpenseForm({
   onCancelEdit
 }: ExpenseFormProps) {
   const amountInputRef = useRef<HTMLInputElement>(null);
-  const defaultCategoryId = categories[0]?.id ?? "";
+  const defaultCategoryId = categories.find((category) => category.name.toLowerCase() === "food & drinks")?.id ?? categories[0]?.id ?? "";
+  const defaultPaymentMethod = mostUsedPaymentMethod(expenses, settings.paymentMethods);
   const [draft, setDraft] = useState<ExpenseDraft>(() => ({
     amount: "",
     date: defaultDate,
     categoryId: defaultCategoryId,
     title: "",
     remark: "",
-    paymentMethod: settings.paymentMethods[0] ?? "Other",
+    paymentMethod: defaultPaymentMethod,
     ...initialDraft
   }));
   const [error, setError] = useState("");
@@ -69,10 +71,10 @@ export function ExpenseForm({
         categoryId: editingExpense.categoryId,
         title: editingExpense.title ?? "",
         remark: editingExpense.remark ?? "",
-        paymentMethod: editingExpense.paymentMethod ?? settings.paymentMethods[0] ?? "Other"
+        paymentMethod: editingExpense.paymentMethod ?? defaultPaymentMethod
       });
     }
-  }, [editingExpense, settings.paymentMethods]);
+  }, [defaultPaymentMethod, editingExpense]);
 
   useEffect(() => {
     if (!editingExpense) {

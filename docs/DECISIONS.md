@@ -36,4 +36,4 @@ The category donut chart is lazy-loaded so the daily tracker does not load Recha
 
 Recurring reminders are derived from each rule's start date and cadence, not only from a mutable next-due pointer. Every scheduled date is handled independently: an exact matching expense records it, while a user discard stores that date in the rule's `discardedDates` list. This prevents duplicate reminders, preserves missed-cycle reminders after schedule edits, and keeps later occurrences independent.
 
-Discarding is persistent by design so an unchanged bill cannot unexpectedly recreate a reminder. Bill editing shows discarded dates and offers an explicit Restore-on-save choice; changing the schedule also clears obsolete discarded dates before recalculation.
+Discarding is persistent during normal use so the reminder stays gone. Any deliberate edit-and-save of that bill clears its discarded dates and recalculates reminders; exact matching expenses still suppress already-recorded occurrences.

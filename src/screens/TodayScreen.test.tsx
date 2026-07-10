@@ -20,9 +20,11 @@ describe("TodayScreen entry flow", () => {
     expect(screen.getByLabelText("Amount")).toHaveFocus();
     expect(screen.getByPlaceholderText("kopi 2.20 yakun paynow")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Fill" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Category")).toHaveValue("cat_food_drinks");
+    expect(screen.getByLabelText("Payment")).toHaveValue("PayNow");
   });
 
-  it("reuses only the latest category and payment defaults", () => {
+  it("defaults to Food & Drinks and the most-used payment method", () => {
     const data = createDefaultProfileData();
     data.expenses = [
       {
@@ -36,6 +38,30 @@ describe("TodayScreen entry flow", () => {
         paymentMethod: "Apple Pay",
         createdAt: "2026-07-09T10:00:00.000Z",
         updatedAt: "2026-07-09T10:00:00.000Z"
+      },
+      {
+        id: "exp_previous_2",
+        amount: 6.2,
+        currency: "SGD",
+        date: "2026-07-08",
+        categoryId: "cat_food_drinks",
+        title: "Lunch",
+        remark: null,
+        paymentMethod: "Apple Pay",
+        createdAt: "2026-07-08T10:00:00.000Z",
+        updatedAt: "2026-07-08T10:00:00.000Z"
+      },
+      {
+        id: "exp_previous_3",
+        amount: 3,
+        currency: "SGD",
+        date: "2026-07-07",
+        categoryId: "cat_shopping",
+        title: "Pen",
+        remark: null,
+        paymentMethod: "PayNow",
+        createdAt: "2026-07-07T10:00:00.000Z",
+        updatedAt: "2026-07-07T10:00:00.000Z"
       }
     ];
     render(
@@ -50,7 +76,7 @@ describe("TodayScreen entry flow", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
     expect(screen.getByLabelText("Amount")).toHaveValue("");
-    expect(screen.getByLabelText("Category")).toHaveValue("cat_transport");
+    expect(screen.getByLabelText("Category")).toHaveValue("cat_food_drinks");
     expect(screen.getByLabelText("Payment")).toHaveValue("Apple Pay");
     expect(screen.getByLabelText("Description")).toHaveValue("");
   });

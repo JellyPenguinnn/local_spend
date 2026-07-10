@@ -58,6 +58,7 @@
 - Fixed the shared Calendar/Summary month selector so it renders in the viewport top layer on iPhone, uses bounded scroll columns, and cannot be displaced by page transitions; Today add now focuses the natural input and offers three compact recent-spend shortcuts for faster reviewed entry.
 - Made manual Today entry the default with amount autofocus, kept natural entry optional, ranked repeat shortcuts by frequency, and rebuilt bill reminders around individual scheduled occurrences with exact-record suppression and persistent discard handling.
 - Simplified add spending again: removed guessed repeat-price shortcuts and mode switching, kept Amount focused, placed natural input inline as an optional form helper, remembered only last-used category/payment, and made discarded bill dates visible and explicitly restorable while editing a bill.
+- Finalized the defaults and discard reset: new spending starts at Food & Drinks with the most-used payment method (PayNow for first use), and editing/saving a bill silently resets discarded reminders without a separate restore interface.
 - Added unit tests for core local logic.
 - Verified lint, TypeScript/web build, JS tests, Rust SQLite tests, and Tauri `.app` build.
 

@@ -4,6 +4,7 @@ import { buildCalendarMonth, formatMonthKey, parseLocalDate } from "../lib/date"
 import { getDailyTotals } from "../lib/analytics";
 import { fallbackCategoryId } from "../lib/categories";
 import { formatCalendarCellAmount, formatMoney } from "../lib/money";
+import { mostUsedPaymentMethod } from "../lib/payments";
 import { parseExpenseWithAiOrLocal, type AiSecretStore } from "../lib/ai/providers";
 import type { Expense, ExpenseDraft, ProfileData } from "../lib/types";
 import { EmptyState } from "../components/EmptyState";
@@ -74,7 +75,7 @@ export function CalendarScreen({ data, upsertExpense, deleteExpense, secrets }: 
         categoryId: parsed.categoryId ?? fallbackCategoryId(data.categories),
         title: parsed.title ?? quickText,
         remark: parsed.source === "ai" ? "AI suggestion" : "",
-        paymentMethod: parsed.paymentMethod ?? data.appSettings.paymentMethods[0] ?? "Other"
+        paymentMethod: parsed.paymentMethod ?? mostUsedPaymentMethod(data.expenses, data.appSettings.paymentMethods)
       });
       setQuickMessage(parsed.source === "ai" ? "AI suggestion ready. Check it before saving." : "Draft ready. Check it before saving.");
     } finally {

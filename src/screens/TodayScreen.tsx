@@ -4,6 +4,7 @@ import { getDailyTotals } from "../lib/analytics";
 import { fallbackCategoryId } from "../lib/categories";
 import { formatLocalIsoDate, parseLocalDate } from "../lib/date";
 import { formatMoney } from "../lib/money";
+import { mostUsedPaymentMethod } from "../lib/payments";
 import { discardRecurringOccurrence, getDueRecurringOccurrences, recordRecurringOccurrence } from "../lib/recurring";
 import { parseExpenseWithAiOrLocal, type AiSecretStore } from "../lib/ai/providers";
 import type { Expense, ExpenseDraft, ProfileData, RecurringCadence } from "../lib/types";
@@ -43,14 +44,6 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
     [data.expenses, today]
   );
   const todayTotal = getDailyTotals(todayExpenses)[today] ?? 0;
-  const lastUsedDefaults = useMemo(() => {
-    const latest = [...data.expenses].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
-    if (!latest) return undefined;
-    return {
-      categoryId: latest.categoryId,
-      paymentMethod: latest.paymentMethod ?? data.appSettings.paymentMethods[0] ?? "Other"
-    };
-  }, [data.appSettings.paymentMethods, data.expenses]);
   const dueOccurrences = useMemo(
     () => getDueRecurringOccurrences(data.recurringRules, data.expenses, today),
     [data.expenses, data.recurringRules, today]
@@ -75,7 +68,7 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
         categoryId: parsed.categoryId ?? fallbackCategoryId(data.categories),
         title: parsed.title ?? quickText,
         remark: parsed.source === "ai" ? "AI suggestion" : "",
-        paymentMethod: parsed.paymentMethod ?? data.appSettings.paymentMethods[0] ?? "Other"
+        paymentMethod: parsed.paymentMethod ?? mostUsedPaymentMethod(data.expenses, data.appSettings.paymentMethods)
       });
       setIsEntryOpen(true);
       setQuickMessage(parsed.source === "ai" ? "AI suggestion ready. Check it before saving." : "Draft ready. Check it before saving.");
@@ -186,7 +179,7 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
             settings={data.appSettings}
             expenses={data.expenses}
             defaultDate={today}
-            initialDraft={quickDraft ?? lastUsedDefaults}
+            initialDraft={quickDraft}
             editingExpense={editingExpense}
             hideDate
             hideTitleRow
