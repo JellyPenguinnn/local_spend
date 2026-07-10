@@ -114,6 +114,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [isAddingPayment, setIsAddingPayment] = useState(false);
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
+  const [restoreDiscardedOnSave, setRestoreDiscardedOnSave] = useState(false);
   const [isEditingCategories, setIsEditingCategories] = useState(false);
   const [isEditingPayments, setIsEditingPayments] = useState(false);
   const [isEditingAccentPalette, setIsEditingAccentPalette] = useState(false);
@@ -143,6 +144,8 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
   const editingRule = editingRuleId ? (data.recurringRules.find((rule) => rule.id === editingRuleId) ?? null) : null;
   const recurringDraftTitle = recurringDraft.title.trim();
   const recurringDraftAmount = parseMoney(recurringDraft.amount);
+  const recurringScheduleChanged =
+    !editingRule || editingRule.startDate !== recurringDraft.startDate || editingRule.cadence !== recurringDraft.cadence;
   const recurringDraftStartRulePreview: RecurringRule | null =
     recurringDraftAmount !== null && recurringDraftTitle.length > 0 && recurringDraft.categoryId && /^\d{4}-\d{2}-\d{2}$/.test(recurringDraft.startDate)
       ? {
@@ -157,14 +160,12 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
           dayOfMonth: Number(recurringDraft.startDate.slice(8, 10)),
           startDate: recurringDraft.startDate,
           nextDate: recurringDraft.startDate,
-          discardedDates: editingRule?.discardedDates ?? [],
+          discardedDates: recurringScheduleChanged || restoreDiscardedOnSave ? [] : (editingRule?.discardedDates ?? []),
           isActive: editingRule?.isActive ?? true,
           createdAt: editingRule?.createdAt ?? "",
           updatedAt: editingRule?.updatedAt ?? ""
         }
       : null;
-  const recurringScheduleChanged =
-    !editingRule || editingRule.startDate !== recurringDraft.startDate || editingRule.cadence !== recurringDraft.cadence;
   const recurringDraftSaveRulePreview = recurringDraftStartRulePreview
     ? {
         ...recurringDraftStartRulePreview,
@@ -443,6 +444,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
 
   function startAddingBill() {
     setEditingRuleId(null);
+    setRestoreDiscardedOnSave(false);
     resetRecurringDraft();
     setPendingDelete(null);
     setIsAddingBill(true);
@@ -451,6 +453,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
 
   function startEditingBill(rule: RecurringRule) {
     setEditingRuleId(rule.id);
+    setRestoreDiscardedOnSave(false);
     setRecurringDraft({
       title: rule.title,
       amount: String(rule.amount),
@@ -467,6 +470,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
   function closeBillForm() {
     setIsAddingBill(false);
     setEditingRuleId(null);
+    setRestoreDiscardedOnSave(false);
     resetRecurringDraft();
   }
 
@@ -491,7 +495,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
       dayOfMonth: Number(recurringDraft.startDate.slice(8, 10)),
       startDate: recurringDraft.startDate,
       nextDate: scheduleChanged ? recurringDraft.startDate : (existingRule?.nextDate ?? recurringDraft.startDate),
-      discardedDates: scheduleChanged ? [] : (existingRule?.discardedDates ?? []),
+      discardedDates: scheduleChanged || restoreDiscardedOnSave ? [] : (existingRule?.discardedDates ?? []),
       isActive: existingRule?.isActive ?? true,
       createdAt: existingRule?.createdAt ?? timestamp,
       updatedAt: timestamp
@@ -867,6 +871,21 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
                 <p className="form-note warning bill-card-note">
                   Bill already recorded for this start date. Next due will be {formatDateForField(recurringDraftNextUnrecordedDate)}.
                 </p>
+              )}
+              {editingRule && (editingRule.discardedDates?.length ?? 0) > 0 && (
+                <div className="bill-discarded-control">
+                  <div>
+                    <strong>{editingRule.discardedDates?.length} discarded</strong>
+                    <span>{editingRule.discardedDates?.map(formatDateForField).join(" · ")}</span>
+                  </div>
+                  <button
+                    className={restoreDiscardedOnSave ? "secondary-button active" : "secondary-button"}
+                    type="button"
+                    onClick={() => setRestoreDiscardedOnSave((value) => !value)}
+                  >
+                    {restoreDiscardedOnSave ? "Restoring" : "Restore"}
+                  </button>
+                </div>
               )}
               <button className="primary-button bill-save-button" type="button" onClick={() => void saveRecurringRule()}>
                 <Check size={17} />

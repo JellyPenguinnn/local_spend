@@ -57,6 +57,7 @@
 - Finalized the NLP approach from research: deterministic slot extraction, Singapore-specific aliases, weighted category rules, and active-profile history override for weak guesses.
 - Fixed the shared Calendar/Summary month selector so it renders in the viewport top layer on iPhone, uses bounded scroll columns, and cannot be displaced by page transitions; Today add now focuses the natural input and offers three compact recent-spend shortcuts for faster reviewed entry.
 - Made manual Today entry the default with amount autofocus, kept natural entry optional, ranked repeat shortcuts by frequency, and rebuilt bill reminders around individual scheduled occurrences with exact-record suppression and persistent discard handling.
+- Simplified add spending again: removed guessed repeat-price shortcuts and mode switching, kept Amount focused, placed natural input inline as an optional form helper, remembered only last-used category/payment, and made discarded bill dates visible and explicitly restorable while editing a bill.
 - Added unit tests for core local logic.
 - Verified lint, TypeScript/web build, JS tests, Rust SQLite tests, and Tauri `.app` build.
 

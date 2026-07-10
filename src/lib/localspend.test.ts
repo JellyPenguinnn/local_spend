@@ -10,7 +10,6 @@ import { parseExpenseLocal } from "./ai/localParser";
 import { parseExpenseWithAiOrLocal } from "./ai/providers";
 import { parseJsonObject, validateAiCategoryJson, validateAiExpenseJson, validateAiInsightsJson } from "./ai/schema";
 import { formatCalendarCellAmount, formatMoney, parseMoney, roundMoney } from "./money";
-import { getFrequentExpenseTemplates } from "./expenseTemplates";
 import {
   advanceRecurringRulePastRecorded,
   discardRecurringOccurrence,
@@ -39,23 +38,6 @@ describe("money formatting and parsing", () => {
     expect(formatCalendarCellAmount(1234.56)).toBe("1235");
     expect(formatCalendarCellAmount(12345.67)).toBe("12.3k");
     expect(formatCalendarCellAmount(1234.56)).not.toContain("SGD");
-  });
-});
-
-describe("frequent expense templates", () => {
-  it("ranks by frequency and uses recency to break ties", () => {
-    const expenses = [
-      makeExpense("cat_transport", "2026-07-01", 2, "Bus"),
-      makeExpense("cat_food_drinks", "2026-07-02", 5, "Yakun"),
-      makeExpense("cat_transport", "2026-07-03", 2, "Bus"),
-      makeExpense("cat_groceries", "2026-07-04", 12, "NTUC"),
-      makeExpense("cat_food_drinks", "2026-07-05", 5.2, "Yakun"),
-      makeExpense("cat_transport", "2026-07-06", 2.1, "Bus"),
-      makeExpense("cat_shopping", "2026-07-07", 8, "Popular")
-    ];
-    const templates = getFrequentExpenseTemplates(expenses);
-    expect(templates.map((expense) => expense.title)).toEqual(["Bus", "Yakun", "Popular"]);
-    expect(templates[0].amount).toBe(2.1);
   });
 });
 
@@ -521,6 +503,9 @@ describe("recurring rules", () => {
     const discarded = discardRecurringOccurrence(withRule, rule.id, "2026-06-03", "2026-07-10");
     expect(discarded.recurringRules[0].discardedDates).toEqual(["2026-06-03"]);
     expect(getDueRecurringOccurrences(discarded.recurringRules, discarded.expenses, "2026-07-10").map((item) => item.date)).toEqual(["2026-07-03"]);
+
+    const restoredRule = { ...discarded.recurringRules[0], discardedDates: [] };
+    expect(getDueRecurringOccurrences([restoredRule], discarded.expenses, "2026-07-10").map((item) => item.date)).toEqual(["2026-06-03", "2026-07-03"]);
 
     const recorded = recordRecurringOccurrence(discarded, rule.id, "2026-07-03", "2026-07-10");
     expect(recorded.created?.date).toBe("2026-07-03");

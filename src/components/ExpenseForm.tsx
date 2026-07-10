@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, Check, RotateCcw } from "lucide-react";
 import { hasDuplicateExpense, suggestFromExpenseHistory } from "../lib/analytics";
 import { suggestCategoryLocal } from "../lib/categories";
@@ -18,6 +18,7 @@ interface ExpenseFormProps {
   hideDate?: boolean;
   hideTitleRow?: boolean;
   autoFocusAmount?: boolean;
+  afterAmount?: ReactNode;
   saveLabel?: string;
   onSave: (expense: Expense, mode: "add" | "edit") => void;
   onCancelEdit?: () => void;
@@ -34,6 +35,7 @@ export function ExpenseForm({
   hideDate = false,
   hideTitleRow = false,
   autoFocusAmount = false,
+  afterAmount,
   saveLabel,
   onSave,
   onCancelEdit
@@ -192,11 +194,9 @@ export function ExpenseForm({
             value={draft.amount}
             placeholder="0.00"
             onChange={(event) => update("amount", event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") submit();
-            }}
           />
         </label>
+        {afterAmount && <div className="span-2 expense-alternate-entry">{afterAmount}</div>}
         {!hideDate && (
           <label>
             <span>Date</span>

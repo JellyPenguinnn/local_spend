@@ -1,11 +1,10 @@
 import { useMemo, useState } from "react";
-import { CalendarDays, Plus, Repeat2, Wand2 } from "lucide-react";
+import { CalendarDays, Plus } from "lucide-react";
 import { getDailyTotals } from "../lib/analytics";
 import { fallbackCategoryId } from "../lib/categories";
 import { formatLocalIsoDate, parseLocalDate } from "../lib/date";
 import { formatMoney } from "../lib/money";
 import { discardRecurringOccurrence, getDueRecurringOccurrences, recordRecurringOccurrence } from "../lib/recurring";
-import { getFrequentExpenseTemplates } from "../lib/expenseTemplates";
 import { parseExpenseWithAiOrLocal, type AiSecretStore } from "../lib/ai/providers";
 import type { Expense, ExpenseDraft, ProfileData, RecurringCadence } from "../lib/types";
 import { EmptyState } from "../components/EmptyState";
@@ -38,14 +37,20 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
   const [quickMessage, setQuickMessage] = useState("");
   const [isParsing, setIsParsing] = useState(false);
   const [isEntryOpen, setIsEntryOpen] = useState(false);
-  const [isNaturalEntryOpen, setIsNaturalEntryOpen] = useState(false);
   const [pendingDiscardOccurrenceId, setPendingDiscardOccurrenceId] = useState<string | null>(null);
   const todayExpenses = useMemo(
     () => data.expenses.filter((expense) => expense.date === today).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [data.expenses, today]
   );
   const todayTotal = getDailyTotals(todayExpenses)[today] ?? 0;
-  const frequentTemplates = useMemo(() => getFrequentExpenseTemplates(data.expenses), [data.expenses]);
+  const lastUsedDefaults = useMemo(() => {
+    const latest = [...data.expenses].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+    if (!latest) return undefined;
+    return {
+      categoryId: latest.categoryId,
+      paymentMethod: latest.paymentMethod ?? data.appSettings.paymentMethods[0] ?? "Other"
+    };
+  }, [data.appSettings.paymentMethods, data.expenses]);
   const dueOccurrences = useMemo(
     () => getDueRecurringOccurrences(data.recurringRules, data.expenses, today),
     [data.expenses, data.recurringRules, today]
@@ -73,7 +78,6 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
         paymentMethod: parsed.paymentMethod ?? data.appSettings.paymentMethods[0] ?? "Other"
       });
       setIsEntryOpen(true);
-      setIsNaturalEntryOpen(false);
       setQuickMessage(parsed.source === "ai" ? "AI suggestion ready. Check it before saving." : "Draft ready. Check it before saving.");
     } finally {
       setIsParsing(false);
@@ -95,7 +99,6 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
     setEditingExpense(expense ?? null);
     setQuickDraft(undefined);
     setQuickMessage("");
-    setIsNaturalEntryOpen(false);
     setIsEntryOpen(true);
   }
 
@@ -104,22 +107,7 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
     setQuickDraft(undefined);
     setQuickText("");
     setQuickMessage("");
-    setIsNaturalEntryOpen(false);
     setIsEntryOpen(false);
-  }
-
-  function applyRecentTemplate(expense: Expense) {
-    setEditingExpense(null);
-    setQuickText("");
-    setQuickDraft({
-      amount: expense.amount,
-      date: today,
-      categoryId: expense.categoryId,
-      title: expense.title ?? "",
-      remark: "",
-      paymentMethod: expense.paymentMethod ?? data.appSettings.paymentMethods[0] ?? "Other"
-    });
-    setQuickMessage("Frequent spend ready. Check it before saving.");
   }
 
   return (
@@ -193,53 +181,28 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
           <button className="secondary-button entry-top-cancel" type="button" onClick={closeEntry}>
             Cancel
           </button>
-          {!editingExpense && (
-            <div className="entry-method-row">
-              {frequentTemplates.length > 0 && <p className="eyebrow">Frequent</p>}
-              <button className="link-button natural-entry-toggle" type="button" onClick={() => setIsNaturalEntryOpen((value) => !value)}>
-                <Wand2 size={15} />
-                {isNaturalEntryOpen ? "Manual entry" : "Natural entry"}
-              </button>
-            </div>
-          )}
-          {!editingExpense && isNaturalEntryOpen && (
-            <NaturalQuickAdd
-              value={quickText}
-              message={quickMessage}
-              isParsing={isParsing}
-              aiEnabled={data.aiSettings.provider !== "none"}
-              autoFocus
-              onChange={setQuickText}
-              onDraft={() => void parseQuickAdd()}
-            />
-          )}
-          {!editingExpense && !isNaturalEntryOpen && !quickDraft && frequentTemplates.length > 0 && (
-            <div className="recent-spend-shortcuts" aria-label="Frequent spending shortcuts">
-              <div>
-                {frequentTemplates.map((expense) => {
-                  const category = data.categories.find((item) => item.id === expense.categoryId);
-                  return (
-                    <button type="button" key={expense.id} onClick={() => applyRecentTemplate(expense)}>
-                      <Repeat2 size={14} />
-                      <span>{expense.title || category?.name || "Spend"}</span>
-                      <strong>{formatMoney(expense.amount, expense.currency || data.appSettings.currency)}</strong>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
           <ExpenseForm
             categories={data.categories}
             settings={data.appSettings}
             expenses={data.expenses}
             defaultDate={today}
-            initialDraft={quickDraft}
+            initialDraft={quickDraft ?? lastUsedDefaults}
             editingExpense={editingExpense}
             hideDate
             hideTitleRow
-            autoFocusAmount={!isNaturalEntryOpen}
+            autoFocusAmount
+            afterAmount={
+              !editingExpense ? (
+                <NaturalQuickAdd
+                  value={quickText}
+                  message={quickMessage}
+                  isParsing={isParsing}
+                  aiEnabled={data.aiSettings.provider !== "none"}
+                  onChange={setQuickText}
+                  onDraft={() => void parseQuickAdd()}
+                />
+              ) : null
+            }
             saveLabel="Save"
             onCancelEdit={closeEntry}
             onSave={(expense) => {

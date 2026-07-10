@@ -139,16 +139,6 @@ export function CalendarScreen({ data, upsertExpense, deleteExpense, secrets }: 
           )}
           {(isAdding || editingExpense) && (
             <>
-              {!editingExpense && (
-                <NaturalQuickAdd
-                  value={quickText}
-                  message={quickMessage}
-                  isParsing={isParsing}
-                  aiEnabled={data.aiSettings.provider !== "none"}
-                  onChange={setQuickText}
-                  onDraft={() => void parseQuickAddForSelectedDay()}
-                />
-              )}
               <ExpenseForm
                 compact
                 categories={data.categories}
@@ -159,6 +149,19 @@ export function CalendarScreen({ data, upsertExpense, deleteExpense, secrets }: 
                 editingExpense={editingExpense}
                 hideDate={!editingExpense}
                 hideTitleRow
+                autoFocusAmount={!editingExpense}
+                afterAmount={
+                  !editingExpense ? (
+                    <NaturalQuickAdd
+                      value={quickText}
+                      message={quickMessage}
+                      isParsing={isParsing}
+                      aiEnabled={data.aiSettings.provider !== "none"}
+                      onChange={setQuickText}
+                      onDraft={() => void parseQuickAddForSelectedDay()}
+                    />
+                  ) : null
+                }
                 saveLabel="Save"
                 onCancelEdit={() => {
                   setEditingExpense(null);

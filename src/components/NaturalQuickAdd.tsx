@@ -25,7 +25,7 @@ export function NaturalQuickAdd({ value, message, isParsing = false, aiEnabled =
   return (
     <div className="quick-add quiet">
       <label>
-        <span>Quick draft</span>
+        <span>Or enter naturally</span>
         <div className="inline-input">
           <input
             ref={inputRef}
@@ -39,7 +39,7 @@ export function NaturalQuickAdd({ value, message, isParsing = false, aiEnabled =
           />
           <button type="button" className="secondary-button" onClick={onDraft} disabled={isParsing}>
             <Wand2 size={16} />
-            Draft
+            Fill
           </button>
         </div>
       </label>
