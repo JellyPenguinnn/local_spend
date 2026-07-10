@@ -41,6 +41,9 @@ jobs:
         env:
           VITE_BASE_PATH: /local_spend/
 
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
