@@ -7,6 +7,13 @@ import { canDeleteCategory } from "../lib/categories";
 import { CURRENCY_OPTIONS, normalizeEnabledCurrencies } from "../lib/currencies";
 import { MAX_CSV_FILE_BYTES, exportExpensesCsv, findNewImportedExpenses, importExpensesCsv } from "../lib/csv";
 import { resetSpendingData as resetProfileSpendingData } from "../lib/dataControls";
+import {
+  MAX_CATEGORY_NAME_LENGTH,
+  MAX_DESCRIPTION_LENGTH,
+  MAX_PAYMENT_METHOD_LENGTH,
+  MAX_PAYMENT_METHODS,
+  MAX_PROFILE_CATEGORIES
+} from "../lib/dataLimits";
 import { compareIsoDates, formatLocalIsoDate, parseLocalDate } from "../lib/date";
 import { createId, MAX_ACCENT_PALETTE_COLORS, normalizeAccentPalette, nowIso } from "../lib/defaults";
 import { formatMoney, parseMoney } from "../lib/money";
@@ -356,6 +363,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
       const importedPayments = pendingCsvImport.expenses.flatMap((expense) => expense.paymentMethod ? [expense.paymentMethod] : []);
       const paymentMethods = [...data.appSettings.paymentMethods];
       for (const method of importedPayments) {
+        if (paymentMethods.length >= MAX_PAYMENT_METHODS) break;
         if (!paymentMethods.some((existing) => existing.toLowerCase() === method.toLowerCase())) paymentMethods.push(method);
       }
       const saved = await saveData({
@@ -466,6 +474,10 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
   async function addPaymentMethod() {
     const method = newMethod.trim();
     if (!method) return;
+    if (data.appSettings.paymentMethods.length >= MAX_PAYMENT_METHODS) {
+      setStatus(`Maximum ${MAX_PAYMENT_METHODS} payment methods.`);
+      return;
+    }
     if (data.appSettings.paymentMethods.some((item) => item.toLowerCase() === method.toLowerCase())) {
       setStatus("That payment method is already in your list.");
       return;
@@ -498,6 +510,10 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
   async function addCategory() {
     const name = newCategoryName.trim();
     if (!name) return;
+    if (data.categories.length >= MAX_PROFILE_CATEGORIES) {
+      setStatus(`Maximum ${MAX_PROFILE_CATEGORIES} categories.`);
+      return;
+    }
     if (data.categories.some((category) => category.name.toLowerCase() === name.toLowerCase())) {
       setStatus("That category already exists.");
       return;
@@ -618,6 +634,10 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
     const amount = parseMoney(recurringDraft.amount);
     if (amount === null || !recurringDraft.title.trim() || !recurringDraft.categoryId || !recurringDraft.startDate) {
       setStatus("Fill in description, amount, category, and start date.");
+      return;
+    }
+    if (recurringDraft.title.trim().length > MAX_DESCRIPTION_LENGTH) {
+      setStatus(`Keep the description under ${MAX_DESCRIPTION_LENGTH} characters.`);
       return;
     }
     const timestamp = nowIso();
@@ -1012,7 +1032,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
               <div className="filter-grid">
                 <label>
                   <span>Description</span>
-                  <input value={recurringDraft.title} onChange={(event) => setRecurringDraft({ ...recurringDraft, title: event.target.value })} />
+                  <input maxLength={MAX_DESCRIPTION_LENGTH} value={recurringDraft.title} onChange={(event) => setRecurringDraft({ ...recurringDraft, title: event.target.value })} />
                 </label>
                 <div className="bill-amount-field">
                   <span className="amount-field-label">Amount</span>
@@ -1214,7 +1234,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
           ) : (
             <div className="settings-subpanel settings-inline-form settings-bottom-form">
               <div className="add-row category-add-row settings-add-row">
-                <input value={newCategoryName} placeholder="New category" onChange={(event) => setNewCategoryName(event.target.value)} />
+                <input maxLength={MAX_CATEGORY_NAME_LENGTH} value={newCategoryName} placeholder="New category" onChange={(event) => setNewCategoryName(event.target.value)} />
                 <input value={newCategoryIcon} placeholder="Icon" onChange={(event) => setNewCategoryIcon(event.target.value.slice(0, 2))} />
                 <input type="color" value={newCategoryColor} onChange={(event) => setNewCategoryColor(event.target.value)} aria-label="New category color" />
               </div>
@@ -1294,7 +1314,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
           ) : (
             <div className="settings-subpanel settings-inline-form settings-bottom-form">
               <div className="add-row settings-add-row">
-                <input value={newMethod} placeholder="New payment method" onChange={(event) => setNewMethod(event.target.value)} />
+                <input maxLength={MAX_PAYMENT_METHOD_LENGTH} value={newMethod} placeholder="New payment method" onChange={(event) => setNewMethod(event.target.value)} />
               </div>
               <div className="settings-form-actions">
                 <button className="primary-button" type="button" onClick={() => void addPaymentMethod()}>

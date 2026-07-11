@@ -2,6 +2,14 @@ import { createDefaultProfileData, createId, normalizeAccentPalette, normalizeRe
 import { normalizeCurrencyCode, normalizeEnabledCurrencies, normalizeExpenses } from "../currencies";
 import type { ProfileData, ProfileMeta, ProfilesState, ThemeKey } from "../types";
 import { clampWallpaperOpacity, trimWallpapers } from "../wallpaper";
+import {
+  BROWSER_PROFILE_SECTION_NAMES,
+  changedBrowserProfileSections,
+  joinBrowserProfileSections,
+  splitBrowserProfileData,
+  type BrowserProfileSectionName,
+  type BrowserProfileSections
+} from "./browserSections";
 
 declare global {
   interface Window {
@@ -233,9 +241,17 @@ class BrowserRepository implements LocalSpendRepository {
 
   private async readProfileData(profileId: string): Promise<ProfileData> {
     if (supportsIndexedDb()) {
-      const stored = await readBrowserProfileData(profileId);
-      if (stored) {
-        return normalizeProfileData(stored);
+      const sections = await readBrowserProfileSections(profileId);
+      if (sections) {
+        const data = normalizeProfileData(joinBrowserProfileSections(sections));
+        browserProfileReferenceCache.set(profileId, data);
+        return data;
+      }
+      const legacy = await readLegacyBrowserProfileData(profileId);
+      if (legacy) {
+        const data = normalizeProfileData(legacy);
+        await writeBrowserProfileData(profileId, data, true);
+        return data;
       }
     }
 
@@ -267,10 +283,12 @@ class BrowserRepository implements LocalSpendRepository {
 }
 
 const BROWSER_DB_NAME = "localspend";
-const BROWSER_DB_VERSION = 1;
+const BROWSER_DB_VERSION = 2;
 const BROWSER_PROFILE_STORE = "profileData";
+const BROWSER_PROFILE_SECTIONS_STORE = "profileSections";
 let browserDbPromise: Promise<IDBDatabase> | null = null;
 let browserPersistenceRequested = false;
+const browserProfileReferenceCache = new Map<string, ProfileData>();
 
 function supportsIndexedDb(): boolean {
   return typeof indexedDB !== "undefined";
@@ -295,15 +313,32 @@ function openBrowserDatabase(): Promise<IDBDatabase> {
       if (!request.result.objectStoreNames.contains(BROWSER_PROFILE_STORE)) {
         request.result.createObjectStore(BROWSER_PROFILE_STORE);
       }
+      if (!request.result.objectStoreNames.contains(BROWSER_PROFILE_SECTIONS_STORE)) {
+        request.result.createObjectStore(BROWSER_PROFILE_SECTIONS_STORE);
+      }
     };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error("Could not open browser storage."));
-    request.onblocked = () => reject(new Error("Browser storage is busy in another LocalSpend window."));
+    request.onsuccess = () => {
+      const database = request.result;
+      database.onversionchange = () => {
+        database.close();
+        browserDbPromise = null;
+        browserProfileReferenceCache.clear();
+      };
+      resolve(database);
+    };
+    request.onerror = () => {
+      browserDbPromise = null;
+      reject(request.error ?? new Error("Could not open browser storage."));
+    };
+    request.onblocked = () => {
+      browserDbPromise = null;
+      reject(new Error("Close other LocalSpend windows, then try again."));
+    };
   });
   return browserDbPromise;
 }
 
-async function readBrowserProfileData(profileId: string): Promise<Partial<ProfileData> | null> {
+async function readLegacyBrowserProfileData(profileId: string): Promise<Partial<ProfileData> | null> {
   const database = await openBrowserDatabase();
   return new Promise((resolve, reject) => {
     const request = database.transaction(BROWSER_PROFILE_STORE, "readonly").objectStore(BROWSER_PROFILE_STORE).get(profileId);
@@ -312,12 +347,45 @@ async function readBrowserProfileData(profileId: string): Promise<Partial<Profil
   });
 }
 
-async function writeBrowserProfileData(profileId: string, data: ProfileData): Promise<void> {
+async function readBrowserProfileSections(profileId: string): Promise<BrowserProfileSections | null> {
   const database = await openBrowserDatabase();
   return new Promise((resolve, reject) => {
-    const transaction = database.transaction(BROWSER_PROFILE_STORE, "readwrite");
-    transaction.objectStore(BROWSER_PROFILE_STORE).put(data, profileId);
-    transaction.oncomplete = () => resolve();
+    const transaction = database.transaction(BROWSER_PROFILE_SECTIONS_STORE, "readonly");
+    const store = transaction.objectStore(BROWSER_PROFILE_SECTIONS_STORE);
+    const values = new Map<BrowserProfileSectionName, unknown>();
+    for (const section of BROWSER_PROFILE_SECTION_NAMES) {
+      const request = store.get(browserSectionKey(profileId, section));
+      request.onsuccess = () => values.set(section, request.result);
+    }
+    transaction.oncomplete = () => {
+      if (BROWSER_PROFILE_SECTION_NAMES.some((section) => values.get(section) === undefined)) {
+        resolve(null);
+        return;
+      }
+      resolve(Object.fromEntries(BROWSER_PROFILE_SECTION_NAMES.map((section) => [section, values.get(section)])) as unknown as BrowserProfileSections);
+    };
+    transaction.onerror = () => reject(transaction.error ?? new Error("Could not read browser data."));
+    transaction.onabort = () => reject(transaction.error ?? new Error("Browser storage stopped the read."));
+  });
+}
+
+async function writeBrowserProfileData(profileId: string, data: ProfileData, removeLegacy = false): Promise<void> {
+  const changedSections = changedBrowserProfileSections(browserProfileReferenceCache.get(profileId), data);
+  if (changedSections.length === 0 && !removeLegacy) return;
+  const database = await openBrowserDatabase();
+  const sections = splitBrowserProfileData(data);
+  return new Promise((resolve, reject) => {
+    const storeNames = removeLegacy ? [BROWSER_PROFILE_SECTIONS_STORE, BROWSER_PROFILE_STORE] : [BROWSER_PROFILE_SECTIONS_STORE];
+    const transaction = database.transaction(storeNames, "readwrite");
+    const store = transaction.objectStore(BROWSER_PROFILE_SECTIONS_STORE);
+    for (const section of changedSections) {
+      store.put(sections[section], browserSectionKey(profileId, section));
+    }
+    if (removeLegacy) transaction.objectStore(BROWSER_PROFILE_STORE).delete(profileId);
+    transaction.oncomplete = () => {
+      browserProfileReferenceCache.set(profileId, data);
+      resolve();
+    };
     transaction.onerror = () => reject(transaction.error ?? new Error("Could not save browser data."));
     transaction.onabort = () => reject(transaction.error ?? new Error("Browser storage stopped the save."));
   });
@@ -327,12 +395,21 @@ async function deleteBrowserProfileData(profileId: string): Promise<void> {
   if (!supportsIndexedDb()) return;
   const database = await openBrowserDatabase();
   return new Promise((resolve, reject) => {
-    const transaction = database.transaction(BROWSER_PROFILE_STORE, "readwrite");
+    const transaction = database.transaction([BROWSER_PROFILE_STORE, BROWSER_PROFILE_SECTIONS_STORE], "readwrite");
     transaction.objectStore(BROWSER_PROFILE_STORE).delete(profileId);
-    transaction.oncomplete = () => resolve();
+    const sectionStore = transaction.objectStore(BROWSER_PROFILE_SECTIONS_STORE);
+    for (const section of BROWSER_PROFILE_SECTION_NAMES) sectionStore.delete(browserSectionKey(profileId, section));
+    transaction.oncomplete = () => {
+      browserProfileReferenceCache.delete(profileId);
+      resolve();
+    };
     transaction.onerror = () => reject(transaction.error ?? new Error("Could not remove browser data."));
     transaction.onabort = () => reject(transaction.error ?? new Error("Browser storage stopped the delete."));
   });
+}
+
+function browserSectionKey(profileId: string, section: BrowserProfileSectionName): string {
+  return `${profileId}:${section}`;
 }
 
 function normalizeProfileData(data: Partial<ProfileData>): ProfileData {

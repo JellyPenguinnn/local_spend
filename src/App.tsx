@@ -11,6 +11,7 @@ import { ProfileSwitcher } from "./components/ProfileSwitcher";
 import { clampWallpaperOpacity } from "./lib/wallpaper";
 import { MAX_BACKUP_FILE_BYTES, restoreBackup } from "./lib/backup";
 import { resolveRecurringRuleNextDate } from "./lib/recurring";
+import { MAX_PROFILE_NAME_LENGTH } from "./lib/dataLimits";
 
 const NAV_ITEMS: Array<{ key: ViewKey; label: string; icon: typeof ClipboardList }> = [
   { key: "today", label: "Today", icon: ClipboardList },
@@ -129,7 +130,7 @@ export default function App() {
   async function createFirstProfile(name: string) {
     setIsLoading(true);
     try {
-      const state = await repository.createProfile({ displayName: name });
+      const state = await repository.createProfile({ displayName: name.trim().slice(0, MAX_PROFILE_NAME_LENGTH) });
       await applyProfilesState(state);
       setView("today");
     } finally {
@@ -249,6 +250,7 @@ function FirstLaunch({ error, onCreate, onRestore }: { error: string; onCreate: 
           <span>Display name</span>
           <input
             autoFocus
+            maxLength={MAX_PROFILE_NAME_LENGTH}
             value={name}
             placeholder="Brian"
             onChange={(event) => setName(event.target.value)}

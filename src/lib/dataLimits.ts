@@ -1,0 +1,10 @@
+export const MAX_PROFILE_CATEGORIES = 200;
+export const MAX_PROFILE_RECORDS = 100_000;
+export const MAX_PAYMENT_METHODS = 50;
+export const MAX_CATEGORY_NAME_LENGTH = 80;
+export const MAX_CATEGORY_ICON_LENGTH = 20;
+export const MAX_DESCRIPTION_LENGTH = 240;
+export const MAX_REMARK_LENGTH = 1200;
+export const MAX_PAYMENT_METHOD_LENGTH = 80;
+export const MAX_NATURAL_INPUT_LENGTH = 320;
+export const MAX_PROFILE_NAME_LENGTH = 80;

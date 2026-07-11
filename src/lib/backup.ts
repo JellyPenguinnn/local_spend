@@ -1,13 +1,22 @@
 import { createDefaultProfileData, normalizeAccentPalette, normalizeRecurringRules } from "./defaults";
 import { normalizeCurrencyCode, normalizeEnabledCurrencies, normalizeExpenses } from "./currencies";
+import {
+  MAX_CATEGORY_ICON_LENGTH,
+  MAX_CATEGORY_NAME_LENGTH,
+  MAX_DESCRIPTION_LENGTH,
+  MAX_PAYMENT_METHOD_LENGTH,
+  MAX_PAYMENT_METHODS,
+  MAX_PROFILE_CATEGORIES,
+  MAX_PROFILE_NAME_LENGTH,
+  MAX_PROFILE_RECORDS,
+  MAX_REMARK_LENGTH
+} from "./dataLimits";
 import { isValidLocalIsoDate } from "./date";
 import type { AiProvider, Budget, Category, Expense, ProfileData, ProfileMeta, RecurringCadence, RecurringRule, ThemeKey, WallpaperImage } from "./types";
 import { MAX_WALLPAPERS, clampWallpaperOpacity } from "./wallpaper";
 
 export const MAX_BACKUP_FILE_BYTES = 12 * 1024 * 1024;
 
-const MAX_CATEGORIES = 200;
-const MAX_RECORDS = 100_000;
 const MAX_WALLPAPER_BACKUP_BYTES = 1024 * 1024;
 
 export interface LocalSpendBackup {
@@ -57,7 +66,7 @@ export function createBackup(profile: ProfileMeta, data: ProfileData, exportedAt
       }
     }
   };
-  return `${JSON.stringify(backup, null, 2)}\n`;
+  return `${JSON.stringify(backup)}\n`;
 }
 
 export function summarizeProfileData(data: ProfileData): ProfileDataSummary {
@@ -89,7 +98,7 @@ export function restoreBackup(json: string): RestoreBackupResult {
     const restoredData = restored.value;
 
     const profile = isRecord(parsed.profile) ? parsed.profile : null;
-    const profileName = typeof profile?.displayName === "string" ? profile.displayName.trim().slice(0, 80) : undefined;
+    const profileName = typeof profile?.displayName === "string" ? profile.displayName.trim().slice(0, MAX_PROFILE_NAME_LENGTH) : undefined;
     return {
       data: restoredData,
       profileName: profileName || undefined,
@@ -130,7 +139,7 @@ function normalizeBackupData(raw: Record<string, unknown>, exportedAt: string): 
     typeof rawSettings.activeWallpaperId === "string" && wallpapers.some((wallpaper) => wallpaper.id === rawSettings.activeWallpaperId)
       ? rawSettings.activeWallpaperId
       : null;
-  const paymentMethods = normalizeTextList(rawSettings.paymentMethods, fallback.appSettings.paymentMethods, 50, 60);
+  const paymentMethods = normalizeTextList(rawSettings.paymentMethods, fallback.appSettings.paymentMethods, MAX_PAYMENT_METHODS, MAX_PAYMENT_METHOD_LENGTH);
   const rawAiSettings = isRecord(raw.aiSettings) ? raw.aiSettings : {};
 
   return {
@@ -172,7 +181,7 @@ function normalizeBackupData(raw: Record<string, unknown>, exportedAt: string): 
 }
 
 function normalizeBackupCategories(value: unknown): ValidationResult<Category[]> {
-  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_CATEGORIES) {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_PROFILE_CATEGORIES) {
     return { error: "This backup has invalid category data." };
   }
   const ids = new Set<string>();
@@ -182,9 +191,9 @@ function normalizeBackupCategories(value: unknown): ValidationResult<Category[]>
     const item = value[index];
     if (!isRecord(item)) return { error: "This backup has invalid category data." };
     const id = normalizeRequiredText(item.id, 120);
-    const name = normalizeRequiredText(item.name, 80);
+    const name = normalizeRequiredText(item.name, MAX_CATEGORY_NAME_LENGTH);
     const color = typeof item.color === "string" && /^#[0-9a-f]{6}$/i.test(item.color) ? item.color.toLowerCase() : null;
-    const icon = normalizeNullableText(item.icon, 20);
+    const icon = normalizeNullableText(item.icon, MAX_CATEGORY_ICON_LENGTH);
     if (!id || !name || !color || icon === false || ids.has(id) || names.has(name.toLowerCase())) {
       return { error: "This backup has invalid or duplicate categories." };
     }
@@ -203,7 +212,7 @@ function normalizeBackupCategories(value: unknown): ValidationResult<Category[]>
 }
 
 function normalizeBackupExpenses(value: unknown, baseCurrency: string, categoryIds: Set<string>): ValidationResult<Expense[]> {
-  if (!Array.isArray(value) || value.length > MAX_RECORDS) return { error: "This backup has invalid expense data." };
+  if (!Array.isArray(value) || value.length > MAX_PROFILE_RECORDS) return { error: "This backup has invalid expense data." };
   const normalized = normalizeExpenses(value, baseCurrency);
   if (normalized.length !== value.length) return { error: "This backup contains unreadable expense records." };
   const ids = new Set<string>();
@@ -217,9 +226,9 @@ function normalizeBackupExpenses(value: unknown, baseCurrency: string, categoryI
     if (expense.baseCurrency !== baseCurrency || !isValidLocalIsoDate(expense.exchangeRateDate)) {
       return { error: "This backup contains incompatible currency data." };
     }
-    const title = normalizeNullableText(raw.title, 240);
-    const remark = normalizeNullableText(raw.remark, 1200);
-    const paymentMethod = normalizeNullableText(raw.paymentMethod, 80);
+    const title = normalizeNullableText(raw.title, MAX_DESCRIPTION_LENGTH);
+    const remark = normalizeNullableText(raw.remark, MAX_REMARK_LENGTH);
+    const paymentMethod = normalizeNullableText(raw.paymentMethod, MAX_PAYMENT_METHOD_LENGTH);
     const recurringRuleId = normalizeNullableText(raw.recurringRuleId, 120);
     const recurringOccurrenceDate = normalizeNullableText(raw.recurringOccurrenceDate, 10);
     if (
@@ -241,7 +250,7 @@ function normalizeBackupExpenses(value: unknown, baseCurrency: string, categoryI
 }
 
 function normalizeBackupBudgets(value: unknown, categoryIds: Set<string>): ValidationResult<Budget[]> {
-  if (!Array.isArray(value) || value.length > MAX_RECORDS) return { error: "This backup has invalid budget data." };
+  if (!Array.isArray(value) || value.length > MAX_PROFILE_RECORDS) return { error: "This backup has invalid budget data." };
   const ids = new Set<string>();
   const budgets: Budget[] = [];
   for (const item of value) {
@@ -268,7 +277,7 @@ function normalizeBackupBudgets(value: unknown, categoryIds: Set<string>): Valid
 }
 
 function normalizeBackupRecurringRules(value: unknown, expenses: Expense[], categoryIds: Set<string>): ValidationResult<RecurringRule[]> {
-  if (!Array.isArray(value) || value.length > MAX_RECORDS) return { error: "This backup has invalid bill data." };
+  if (!Array.isArray(value) || value.length > MAX_PROFILE_RECORDS) return { error: "This backup has invalid bill data." };
   const normalized = normalizeRecurringRules(value, expenses);
   if (normalized.length !== value.length) return { error: "This backup contains unreadable bill records." };
   const ids = new Set<string>();
@@ -279,9 +288,9 @@ function normalizeBackupRecurringRules(value: unknown, expenses: Expense[], cate
     if (!isRecord(raw) || !rule || ids.has(rule.id) || !categoryIds.has(rule.categoryId)) {
       return { error: "This backup contains invalid or duplicate bills." };
     }
-    const title = normalizeRequiredText(rule.title, 240);
-    const remark = normalizeNullableText(raw.remark, 1200);
-    const paymentMethod = normalizeNullableText(raw.paymentMethod, 80);
+    const title = normalizeRequiredText(rule.title, MAX_DESCRIPTION_LENGTH);
+    const remark = normalizeNullableText(raw.remark, MAX_REMARK_LENGTH);
+    const paymentMethod = normalizeNullableText(raw.paymentMethod, MAX_PAYMENT_METHOD_LENGTH);
     const discardedDates = Array.isArray(raw.discardedDates) ? raw.discardedDates : [];
     if (
       !title ||

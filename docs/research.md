@@ -134,3 +134,12 @@ Researched on 2026-07-11.
 - IndexedDB is the appropriate browser store for structured, transactional local data. LocalSpend writes the complete active profile atomically rather than splitting related records across separate localStorage writes: https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Basic_Terminology
 - Actual Budget separates complete backups from data import/export and recommends backing up before a restore. LocalSpend follows that pattern: JSON is the complete recovery format, CSV is expense interchange, and restore/reset create a safety backup first: https://actualbudget.org/docs/backup-restore/backup/ and https://actualbudget.org/docs/backup-restore/restore/
 - OWASP notes that spreadsheet programs may execute cells beginning with formula characters. LocalSpend neutralizes those cells on CSV export and removes only its own escape marker on import for a safe round trip: https://owasp.org/www-community/attacks/CSV_Injection
+
+## Local Data Footprint
+
+Researched on 2026-07-11.
+
+- Current web storage guidance recommends Cache Storage for app-loading resources and IndexedDB for structured user data. It also recommends catching quota errors and requesting persistence only for important data: https://web.dev/articles/storage-for-the-web and https://web.dev/articles/persistent-storage
+- IndexedDB creates structured clones on the main thread. Persisting one large nested state object after every change can therefore cause unnecessary blocking; dividing it into subtrees and writing only changed sections is the recommended direction: https://web.dev/articles/indexeddb-best-practices-app-state and https://web.dev/articles/indexeddb
+- Cache Storage is an explicit resource map and old caches should be deleted to respect disk space. LocalSpend now caches successful same-origin shell resources only, while its separate capped rate cache handles exchange-rate responses: https://developer.mozilla.org/en-US/docs/Web/API/CacheStorage
+- SQLite tracks deleted pages on a freelist and reuses them for later writes. LocalSpend keeps transactional normalized tables and avoids aggressive automatic vacuuming during normal personal use, which would add write work for little practical saving: https://sqlite.org/fileformat.html#the_freelist

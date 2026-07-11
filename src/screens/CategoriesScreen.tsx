@@ -3,6 +3,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { searchExpenses } from "../lib/analytics";
 import { canDeleteCategory } from "../lib/categories";
 import { createId } from "../lib/defaults";
+import { MAX_CATEGORY_NAME_LENGTH, MAX_PROFILE_CATEGORIES } from "../lib/dataLimits";
 import { parseMoney } from "../lib/money";
 import type { Category, Expense, ProfileData } from "../lib/types";
 import { EmptyState } from "../components/EmptyState";
@@ -44,6 +45,7 @@ export function CategoriesScreen({ data, saveData, upsertExpense, deleteExpense 
   async function addCategory() {
     const name = newName.trim();
     if (!name) return;
+    if (data.categories.length >= MAX_PROFILE_CATEGORIES) return;
     if (data.categories.some((category) => category.name.toLowerCase() === name.toLowerCase())) {
       alert("That category already exists.");
       return;
@@ -162,7 +164,7 @@ export function CategoriesScreen({ data, saveData, upsertExpense, deleteExpense 
               return (
                 <article className="category-editor-row" key={category.id}>
                   <input type="color" value={category.color} onChange={(event) => void updateCategory(category, { color: event.target.value })} aria-label={`Color for ${category.name}`} />
-                  <input value={category.name} onChange={(event) => void updateCategory(category, { name: event.target.value })} />
+                  <input maxLength={MAX_CATEGORY_NAME_LENGTH} value={category.name} onChange={(event) => void updateCategory(category, { name: event.target.value })} />
                   <span className="muted small">{count}</span>
                   <button className="icon-button danger-icon" type="button" onClick={() => void deleteCategory(category)} aria-label="Delete category" title="Delete category">
                     <Trash2 size={16} />
@@ -172,7 +174,7 @@ export function CategoriesScreen({ data, saveData, upsertExpense, deleteExpense 
             })}
           </div>
           <div className="add-row category-add-row">
-            <input value={newName} placeholder="New category" onChange={(event) => setNewName(event.target.value)} />
+            <input maxLength={MAX_CATEGORY_NAME_LENGTH} value={newName} placeholder="New category" onChange={(event) => setNewName(event.target.value)} />
             <input type="color" value={newColor} onChange={(event) => setNewColor(event.target.value)} aria-label="New category color" />
             <button className="secondary-button" type="button" onClick={() => void addCategory()}>
               <Plus size={16} />

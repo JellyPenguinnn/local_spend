@@ -5,6 +5,7 @@ import { suggestCategoryLocal } from "./categories";
 import { exportExpensesCsv, findNewImportedExpenses, importExpensesCsv } from "./csv";
 import { resetSpendingData } from "./dataControls";
 import { buildCalendarMonth, formatLocalIsoDate, previousMonthKey } from "./date";
+import { pruneExpiredExpenseDrafts } from "./drafts";
 import { fetchReferenceRate, latestCachedRate, normalizeEnabledCurrencies } from "./currencies";
 import { createDefaultProfileData, normalizeAccentPalette, normalizeRecurringRules } from "./defaults";
 import { parseExpenseLocal } from "./ai/localParser";
@@ -24,6 +25,7 @@ import {
   resolveRecurringRuleNextDate
 } from "./recurring";
 import { createRepository } from "./storage/repository";
+import { changedBrowserProfileSections, joinBrowserProfileSections, splitBrowserProfileData } from "./storage/browserSections";
 import { MAX_WALLPAPERS, clampWallpaperOpacity, trimWallpapers } from "./wallpaper";
 import type { Expense, ProfileData, ProfileMeta, RecurringRule, WallpaperImage } from "./types";
 
@@ -128,6 +130,55 @@ describe("profile creation and data isolation", () => {
 
     await repo.switchProfile(firstId);
     expect((await repo.getProfileData(firstId)).expenses[0].title).toBe("Lunch");
+  });
+});
+
+describe("browser storage efficiency", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("round-trips wallpapers separately and writes only changed profile sections", () => {
+    const data = createDefaultProfileData();
+    data.appSettings.wallpapers = [
+      {
+        id: "wallpaper_1",
+        name: "Stars",
+        dataUrl: "data:image/webp;base64,AAAA",
+        mimeType: "image/webp",
+        sizeBytes: 4,
+        createdAt: "2026-07-11T00:00:00.000Z"
+      }
+    ];
+    const sections = splitBrowserProfileData(data);
+    expect(sections.appSettings.wallpapers).toEqual([]);
+    expect(joinBrowserProfileSections(sections)).toEqual(data);
+
+    const expenseChange = { ...data, expenses: [makeExpense(data.categories[0].id, "2026-07-11", 5, "Lunch")] };
+    expect(changedBrowserProfileSections(data, expenseChange)).toEqual(["expenses"]);
+
+    const appearanceChange = { ...data, appSettings: { ...data.appSettings, accentColor: "#123456" } };
+    expect(changedBrowserProfileSections(data, appearanceChange)).toEqual(["appSettings"]);
+
+    const wallpaperChange = {
+      ...data,
+      appSettings: { ...data.appSettings, wallpapers: [...data.appSettings.wallpapers, { ...data.appSettings.wallpapers[0], id: "wallpaper_2" }] }
+    };
+    expect(changedBrowserProfileSections(data, wallpaperChange)).toEqual(["appSettings", "wallpapers"]);
+  });
+
+  it("removes expired or damaged draft records without touching current drafts", () => {
+    const now = Date.UTC(2026, 6, 11);
+    localStorage.setItem("localspend.draft.v1.profile.old", JSON.stringify({ savedAt: now - 8 * 24 * 60 * 60 * 1000, draft: { amount: "5" } }));
+    localStorage.setItem("localspend.draft.v1.profile.current", JSON.stringify({ savedAt: now, draft: { amount: "6" } }));
+    localStorage.setItem("localspend.draft.v1.profile.damaged", "not-json");
+    localStorage.setItem("unrelated", "keep");
+
+    expect(pruneExpiredExpenseDrafts(now)).toBe(2);
+    expect(localStorage.getItem("localspend.draft.v1.profile.old")).toBeNull();
+    expect(localStorage.getItem("localspend.draft.v1.profile.damaged")).toBeNull();
+    expect(localStorage.getItem("localspend.draft.v1.profile.current")).not.toBeNull();
+    expect(localStorage.getItem("unrelated")).toBe("keep");
   });
 });
 
@@ -359,6 +410,8 @@ describe("CSV import/export and backups", () => {
     data.aiSettings.apiKeySaved = true;
     const exportedAt = "2026-07-11T12:00:00.000Z";
     const json = createBackup(profile, data, exportedAt);
+    expect(json).not.toContain('\n  "app"');
+    expect(json.endsWith("\n")).toBe(true);
     const raw = JSON.parse(json) as { data: ProfileData };
     expect(raw.data.aiSettings.apiKeySaved).toBe(false);
     expect(raw.data.appSettings.lastBackupAt).toBe(exportedAt);

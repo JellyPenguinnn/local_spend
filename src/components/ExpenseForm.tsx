@@ -6,6 +6,7 @@ import { fetchReferenceRate, latestCachedRate, latestKnownRate, normalizeCurrenc
 import { parseLocalDate } from "../lib/date";
 import { createId, nowIso } from "../lib/defaults";
 import { clearExpenseDraft, loadExpenseDraft, saveExpenseDraft } from "../lib/drafts";
+import { MAX_DESCRIPTION_LENGTH, MAX_REMARK_LENGTH } from "../lib/dataLimits";
 import { formatCompactMoney, parseMoney, roundMoney } from "../lib/money";
 import { mostUsedPaymentMethod } from "../lib/payments";
 import type { AppSettings, Category, ExchangeRateSource, Expense, ExpenseDraft } from "../lib/types";
@@ -250,6 +251,14 @@ export function ExpenseForm({
       categoryInputRef.current?.focus();
       return;
     }
+    if (draft.title.trim().length > MAX_DESCRIPTION_LENGTH) {
+      setError(`Keep the description under ${MAX_DESCRIPTION_LENGTH} characters.`);
+      return;
+    }
+    if (draft.remark.trim().length > MAX_REMARK_LENGTH) {
+      setError(`Keep the remark under ${MAX_REMARK_LENGTH} characters.`);
+      return;
+    }
     const parsedBaseAmount = isForeignCurrency
       ? typeof draft.baseAmount === "number"
         ? draft.baseAmount
@@ -414,7 +423,7 @@ export function ExpenseForm({
         </label>
         <label className="span-2">
           <span>Description</span>
-          <input autoComplete="off" enterKeyHint="next" value={draft.title} placeholder="Lunch, NTUC, Grab..." onChange={(event) => update("title", event.target.value)} />
+          <input autoComplete="off" enterKeyHint="next" maxLength={MAX_DESCRIPTION_LENGTH} value={draft.title} placeholder="Lunch, NTUC, Grab..." onChange={(event) => update("title", event.target.value)} />
         </label>
         {shouldShowSmartSuggestion && (
           <button
@@ -438,7 +447,7 @@ export function ExpenseForm({
         {isRemarkOpen ? (
           <label className="span-2">
             <span>Remark</span>
-            <input autoComplete="off" enterKeyHint="done" value={draft.remark} placeholder="Optional note" onChange={(event) => update("remark", event.target.value)} />
+            <input autoComplete="off" enterKeyHint="done" maxLength={MAX_REMARK_LENGTH} value={draft.remark} placeholder="Optional note" onChange={(event) => update("remark", event.target.value)} />
           </label>
         ) : (
           <button className="optional-field-toggle span-2" type="button" onClick={() => setIsRemarkOpen(true)}>

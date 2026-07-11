@@ -34,7 +34,9 @@ The category donut chart is lazy-loaded so the daily tracker does not load Recha
 
 ## Browser Persistence
 
-The hosted PWA stores profile data and compressed wallpapers in IndexedDB. Profile metadata remains a very small localStorage record, and temporary unfinished expense drafts use a separate expiring local key. Existing PWA profile payloads migrate from localStorage to IndexedDB on first read. After user-initiated saves, the PWA requests persistent storage where supported; denial never blocks saving. Downloaded backups are not duplicated inside browser storage.
+The hosted PWA stores profile data and compressed wallpapers in atomic IndexedDB sections. Expenses, categories, budgets, bills, settings, wallpapers, and AI configuration are separate records, so a normal save only clones and writes changed sections. Existing single-record IndexedDB and earlier localStorage payloads migrate lazily in one transaction. Profile metadata remains a very small localStorage record, expired form drafts are pruned automatically, and the small exchange-rate cache is capped. After user-initiated saves, the PWA requests persistent storage where supported; denial never blocks saving. Downloaded backups are not duplicated inside browser storage.
+
+The service worker caches only successful same-origin app resources. Exchange-rate responses are not duplicated in Cache Storage because the rate helper already maintains its own bounded cache. Old shell caches are removed on activation.
 
 Complete JSON restore is validated before any write and rejected as a whole when core records are malformed. Restore and reset create a dated safety backup before replacing or clearing data. CSV remains an expense interchange format, not a full backup: imports validate records and suppress existing and within-file duplicates, while exports neutralize spreadsheet formula prefixes.
 

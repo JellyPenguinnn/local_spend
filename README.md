@@ -156,7 +156,7 @@ profiles/
     exports/
 ```
 
-`profiles.json` stores profile metadata only. Spending records live in the active profile database. In browser/PWA mode, profile records and wallpapers use IndexedDB instead of SQLite so the app can run from GitHub Pages; earlier localStorage profile data migrates automatically on first launch.
+`profiles.json` stores profile metadata only. Spending records live in the active profile database. In browser/PWA mode, profile sections and wallpapers use IndexedDB instead of SQLite so the app can run from GitHub Pages. Existing single-record IndexedDB and earlier localStorage data migrate automatically on first launch. Only changed sections are rewritten, so adding an expense does not rewrite wallpapers or unrelated settings.
 
 Each expense stores its original amount/currency and a dated base-currency value. The original value remains visible in transaction details, while Calendar, Summary, category distribution, and budgets use the stable base value. Historical expenses are not revalued later.
 

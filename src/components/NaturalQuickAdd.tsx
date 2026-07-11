@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from "react";
 import { Sparkles, Wand2 } from "lucide-react";
+import { MAX_NATURAL_INPUT_LENGTH } from "../lib/dataLimits";
 
 interface NaturalQuickAddProps {
   value: string;
@@ -34,6 +35,7 @@ export function NaturalQuickAdd({ value, message, isParsing = false, aiEnabled =
           autoFocus={autoFocus}
           autoComplete="off"
           enterKeyHint="done"
+          maxLength={MAX_NATURAL_INPUT_LENGTH}
           value={value}
           placeholder={NATURAL_ENTRY_EXAMPLE}
           aria-describedby={message ? messageId : undefined}

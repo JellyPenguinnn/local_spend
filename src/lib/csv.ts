@@ -1,14 +1,10 @@
 import { createId, nowIso } from "./defaults";
+import { MAX_DESCRIPTION_LENGTH, MAX_PAYMENT_METHOD_LENGTH, MAX_PROFILE_RECORDS, MAX_REMARK_LENGTH } from "./dataLimits";
 import { isValidLocalIsoDate } from "./date";
 import { parseMoney, roundMoney } from "./money";
 import type { Category, Expense } from "./types";
 
 export const MAX_CSV_FILE_BYTES = 8 * 1024 * 1024;
-
-const MAX_CSV_RECORDS = 100_000;
-const MAX_TITLE_LENGTH = 240;
-const MAX_REMARK_LENGTH = 1200;
-const MAX_PAYMENT_METHOD_LENGTH = 80;
 
 export interface CsvImportResult {
   expenses: Expense[];
@@ -68,7 +64,7 @@ export function importExpensesCsv(csv: string, categories: Category[], fallbackC
   if (rows.length === 0) {
     return { expenses: [], errors: ["The CSV file is empty."] };
   }
-  if (rows.length - 1 > MAX_CSV_RECORDS) {
+  if (rows.length - 1 > MAX_PROFILE_RECORDS) {
     return { expenses: [], errors: ["The CSV has too many rows. Import no more than 100,000 expenses at a time."] };
   }
   const headers = rows[0].map((header) => normalizeHeader(header));
@@ -90,6 +86,7 @@ export function importExpensesCsv(csv: string, categories: Category[], fallbackC
   }
 
   const categoryByName = new Map(categories.map((category) => [category.name.toLowerCase(), category.id]));
+  const categoryIds = new Set(categories.map((category) => category.id));
   const expenses: Expense[] = [];
   for (let index = 1; index < rows.length; index += 1) {
     const row = rows[index];
@@ -103,7 +100,7 @@ export function importExpensesCsv(csv: string, categories: Category[], fallbackC
     const importedBaseAmount = baseAmountIndex >= 0 ? parseMoney(row[baseAmountIndex] ?? "") : null;
     const baseCurrency = (row[baseCurrencyIndex]?.trim() || fallbackCurrency).toUpperCase();
     const categoryText = decodeSpreadsheetText(row[categoryIndex]?.trim() ?? "");
-    const categoryId = categoryByName.get(categoryText.toLowerCase()) ?? categories.find((category) => category.id === categoryText)?.id;
+    const categoryId = categoryByName.get(categoryText.toLowerCase()) ?? (categoryIds.has(categoryText) ? categoryText : undefined);
     const title = cleanOptional(decodeSpreadsheetText(row[titleIndex] ?? ""));
     const remark = cleanOptional(decodeSpreadsheetText(row[remarkIndex] ?? ""));
     const paymentMethod = cleanOptional(decodeSpreadsheetText(row[paymentIndex] ?? ""));
@@ -150,7 +147,7 @@ export function importExpensesCsv(csv: string, categories: Category[], fallbackC
       continue;
     }
     if (
-      (title?.length ?? 0) > MAX_TITLE_LENGTH ||
+      (title?.length ?? 0) > MAX_DESCRIPTION_LENGTH ||
       (remark?.length ?? 0) > MAX_REMARK_LENGTH ||
       (paymentMethod?.length ?? 0) > MAX_PAYMENT_METHOD_LENGTH
     ) {
@@ -185,29 +182,30 @@ export function importExpensesCsv(csv: string, categories: Category[], fallbackC
 export function findNewImportedExpenses(imported: Expense[], existing: Expense[]): CsvMergeResult {
   const expenses: Expense[] = [];
   let duplicateCount = 0;
+  const known = new Set(existing.map(importedExpenseIdentity));
   for (const expense of imported) {
-    if (isDuplicateImportedExpense(expense, [...existing, ...expenses])) {
+    const identity = importedExpenseIdentity(expense);
+    if (known.has(identity)) {
       duplicateCount += 1;
     } else {
       expenses.push(expense);
+      known.add(identity);
     }
   }
   return { expenses, duplicateCount };
 }
 
-function isDuplicateImportedExpense(expense: Expense, existing: Expense[]): boolean {
+function importedExpenseIdentity(expense: Expense): string {
   const normalizedText = (value: string | null | undefined) => value?.trim().toLowerCase() ?? "";
-  return existing.some((item) => {
-    return (
-      item.date === expense.date &&
-      item.amount === expense.amount &&
-      item.currency === expense.currency &&
-      item.categoryId === expense.categoryId &&
-      normalizedText(item.title) === normalizedText(expense.title) &&
-      normalizedText(item.remark) === normalizedText(expense.remark) &&
-      normalizedText(item.paymentMethod) === normalizedText(expense.paymentMethod)
-    );
-  });
+  return JSON.stringify([
+    expense.date,
+    expense.amount,
+    expense.currency,
+    expense.categoryId,
+    normalizedText(expense.title),
+    normalizedText(expense.remark),
+    normalizedText(expense.paymentMethod)
+  ]);
 }
 
 function isExchangeRateSource(value: string | undefined): value is Expense["exchangeRateSource"] {

@@ -42,7 +42,7 @@ describe("Settings data controls", () => {
       profile.id,
       "backup",
       expect.stringMatching(/-backup\.json$/),
-      expect.stringContaining('"app": "LocalSpend"')
+      expect.stringContaining('"app":"LocalSpend"')
     );
     await waitFor(() => expect(saveData).toHaveBeenCalledTimes(1));
     expect(saveData.mock.calls[0][0].appSettings.lastBackupAt).toEqual(expect.any(String));
