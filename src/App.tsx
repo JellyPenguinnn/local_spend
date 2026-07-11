@@ -9,6 +9,8 @@ import { SummaryScreen } from "./screens/SummaryScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { ProfileSwitcher } from "./components/ProfileSwitcher";
 import { clampWallpaperOpacity } from "./lib/wallpaper";
+import { restoreBackup } from "./lib/backup";
+import { resolveRecurringRuleNextDate } from "./lib/recurring";
 
 const NAV_ITEMS: Array<{ key: ViewKey; label: string; icon: typeof ClipboardList }> = [
   { key: "today", label: "Today", icon: ClipboardList },
@@ -81,31 +83,35 @@ export default function App() {
     themeColorMeta?.setAttribute("content", activeWallpaper ? accentColor : theme === "dark" ? "#171917" : "#fafaf7");
   }, [data?.appSettings]);
 
-  async function saveData(nextData: ProfileData) {
-    if (!profilesState.activeProfileId) return;
-    setData(nextData);
+  async function saveData(nextData: ProfileData): Promise<boolean> {
+    if (!profilesState.activeProfileId) return false;
+    setError("");
     try {
       const saved = await repository.saveProfileData(profilesState.activeProfileId, nextData);
       setData(saved);
+      return true;
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Could not save changes.");
+      return false;
     }
   }
 
-  async function upsertExpense(expense: Expense) {
-    if (!data) return;
+  async function upsertExpense(expense: Expense): Promise<boolean> {
+    if (!data) return false;
     const exists = data.expenses.some((item) => item.id === expense.id);
-    await saveData({
+    return saveData({
       ...data,
       expenses: exists ? data.expenses.map((item) => (item.id === expense.id ? expense : item)) : [...data.expenses, expense]
     });
   }
 
-  async function deleteExpense(expenseId: string) {
-    if (!data) return;
-    await saveData({
+  async function deleteExpense(expenseId: string): Promise<boolean> {
+    if (!data) return false;
+    const expenses = data.expenses.filter((expense) => expense.id !== expenseId);
+    return saveData({
       ...data,
-      expenses: data.expenses.filter((expense) => expense.id !== expenseId)
+      expenses,
+      recurringRules: data.recurringRules.map((rule) => resolveRecurringRuleNextDate(rule, expenses))
     });
   }
 
@@ -131,6 +137,26 @@ export default function App() {
     }
   }
 
+  async function restoreFirstProfile(file: File): Promise<string | null> {
+    const restored = restoreBackup(await file.text());
+    if (!restored.data) return restored.error ?? "Could not restore that backup.";
+    let createdProfileId: string | null = null;
+    try {
+      const state = await repository.createProfile({ displayName: restored.profileName?.trim() || "My spending" });
+      if (!state.activeProfileId) return "Could not create a local profile for this backup.";
+      createdProfileId = state.activeProfileId;
+      await repository.saveProfileData(state.activeProfileId, restored.data);
+      await applyProfilesState(state);
+      setView("today");
+      return null;
+    } catch (restoreError) {
+      if (createdProfileId) {
+        await repository.deleteProfile(createdProfileId).catch(() => undefined);
+      }
+      return restoreError instanceof Error ? restoreError.message : "Could not restore that backup.";
+    }
+  }
+
   if (isLoading) {
     return (
       <main className="loading-shell">
@@ -141,7 +167,7 @@ export default function App() {
   }
 
   if (!activeProfile || !data) {
-    return <FirstLaunch error={error} onCreate={(name) => void createFirstProfile(name)} />;
+    return <FirstLaunch error={error} onCreate={(name) => void createFirstProfile(name)} onRestore={restoreFirstProfile} />;
   }
 
   return (
@@ -177,7 +203,7 @@ export default function App() {
         </div>
 
         {error && (
-          <div className="error-banner">
+          <div className="error-banner" role="alert">
             <span>{error}</span>
             <button type="button" onClick={() => setError("")}>
               Dismiss
@@ -186,8 +212,8 @@ export default function App() {
         )}
 
         <div className="view-stage" key={view}>
-          {view === "today" && <TodayScreen data={data} saveData={saveData} upsertExpense={upsertExpense} deleteExpense={deleteExpense} secrets={secrets} />}
-          {view === "calendar" && <CalendarScreen data={data} upsertExpense={upsertExpense} deleteExpense={deleteExpense} secrets={secrets} />}
+          {view === "today" && <TodayScreen profileId={activeProfile.id} data={data} saveData={saveData} upsertExpense={upsertExpense} deleteExpense={deleteExpense} secrets={secrets} />}
+          {view === "calendar" && <CalendarScreen profileId={activeProfile.id} data={data} upsertExpense={upsertExpense} deleteExpense={deleteExpense} secrets={secrets} />}
           {view === "summary" && <SummaryScreen data={data} saveData={saveData} />}
           {view === "settings" && (
             <SettingsScreen
@@ -203,8 +229,9 @@ export default function App() {
   );
 }
 
-function FirstLaunch({ error, onCreate }: { error: string; onCreate: (name: string) => void }) {
+function FirstLaunch({ error, onCreate, onRestore }: { error: string; onCreate: (name: string) => void; onRestore: (file: File) => Promise<string | null> }) {
   const [name, setName] = useState("");
+  const [restoreError, setRestoreError] = useState("");
   return (
     <main className="first-launch">
       <section className="first-card">
@@ -232,7 +259,21 @@ function FirstLaunch({ error, onCreate }: { error: string; onCreate: (name: stri
         <button className="primary-button" type="button" disabled={!name.trim()} onClick={() => onCreate(name.trim())}>
           Create profile
         </button>
-        {error && <p className="form-note danger">{error}</p>}
+        <div className="first-launch-divider"><span>or</span></div>
+        <label className="file-button first-restore-button">
+          Restore backup
+          <input
+            type="file"
+            accept="application/json,.json"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.currentTarget.value = "";
+              if (!file) return;
+              void onRestore(file).then((message) => setRestoreError(message ?? ""));
+            }}
+          />
+        </label>
+        {(error || restoreError) && <p className="form-note danger" role="alert">{restoreError || error}</p>}
       </section>
     </main>
   );

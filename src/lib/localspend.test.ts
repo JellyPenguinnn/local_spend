@@ -16,7 +16,10 @@ import {
   advanceRecurringRulePastRecorded,
   discardRecurringOccurrence,
   getDueRecurringOccurrences,
+  getUpcomingRecurringOccurrences,
+  linkRecordedRecurringExpenses,
   materializeDueRecurring,
+  reconcileRecurringOccurrence,
   recordRecurringOccurrence,
   resolveRecurringRuleNextDate
 } from "./recurring";
@@ -584,7 +587,42 @@ describe("recurring rules", () => {
     };
     const result = materializeDueRecurring({ ...data, recurringRules: [rule] }, "2026-07-07");
     expect(result.created).toHaveLength(1);
+    expect(result.created[0]).toMatchObject({ recurringRuleId: "rule_1", recurringOccurrenceDate: "2026-07-05" });
     expect(result.data.recurringRules[0].nextDate).toBe("2026-08-05");
+  });
+
+  it("keeps recorded months handled after a bill amount is edited", () => {
+    const data = createDefaultProfileData();
+    const rule = makeRecurringRule({ startDate: "2026-07-05", nextDate: "2026-07-05" });
+    const recorded = recordRecurringOccurrence({ ...data, recurringRules: [rule] }, rule.id, "2026-07-05", "2026-07-10");
+    const editedRule = { ...recorded.data.recurringRules[0], amount: 25, nextDate: "2026-07-05" };
+
+    expect(getDueRecurringOccurrences([editedRule], recorded.data.expenses, "2026-07-10")).toHaveLength(0);
+    expect(resolveRecurringRuleNextDate(editedRule, recorded.data.expenses).nextDate).toBe("2026-08-05");
+  });
+
+  it("reconciles a manually recorded bill with a changed amount", () => {
+    const data = createDefaultProfileData();
+    const rule = makeRecurringRule({ startDate: "2026-07-05", nextDate: "2026-07-05" });
+    const manualExpense = { ...makeExpense("cat_bills", "2026-07-05", 22, "Phone bill"), paymentMethod: "Credit Card" };
+    const withExpense = { ...data, expenses: [manualExpense], recurringRules: [rule] };
+    const due = getDueRecurringOccurrences([rule], [manualExpense], "2026-07-10");
+
+    expect(due[0].relatedExpense?.id).toBe(manualExpense.id);
+    const reconciled = reconcileRecurringOccurrence(withExpense, rule.id, "2026-07-05", manualExpense.id, "2026-07-10");
+    expect(reconciled.expenses[0]).toMatchObject({ recurringRuleId: rule.id, recurringOccurrenceDate: "2026-07-05" });
+    expect(getDueRecurringOccurrences(reconciled.recurringRules, reconciled.expenses, "2026-07-10")).toHaveLength(0);
+  });
+
+  it("links legacy exact bill records and shows only actionable upcoming bills", () => {
+    const rule = makeRecurringRule({ startDate: "2026-07-05", nextDate: "2026-07-05" });
+    const existing = { ...makeExpense("cat_bills", "2026-07-05", 20, "Phone bill"), paymentMethod: "Credit Card" };
+    const linked = linkRecordedRecurringExpenses([existing], rule);
+    expect(linked[0]).toMatchObject({ recurringRuleId: rule.id, recurringOccurrenceDate: "2026-07-05" });
+
+    const nextRule = { ...rule, startDate: "2026-07-15", nextDate: "2026-07-15" };
+    expect(getUpcomingRecurringOccurrences([nextRule], [], "2026-07-10", 7).map((item) => item.date)).toEqual(["2026-07-15"]);
+    expect(getUpcomingRecurringOccurrences([rule], [], "2026-07-10", 7)).toHaveLength(0);
   });
 
   it("records only one missing occurrence per recurring rule confirmation", () => {

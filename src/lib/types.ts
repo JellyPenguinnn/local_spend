@@ -46,6 +46,9 @@ export interface Expense {
   title?: string | null;
   remark?: string | null;
   paymentMethod?: string | null;
+  /** Stable link to the recurring occurrence that created or reconciled this expense. */
+  recurringRuleId?: string | null;
+  recurringOccurrenceDate?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -86,6 +89,7 @@ export interface AppSettings {
   wallpapers: WallpaperImage[];
   activeWallpaperId?: string | null;
   wallpaperOpacity: number;
+  lastBackupAt?: string | null;
 }
 
 export interface WallpaperImage {

@@ -32,9 +32,15 @@ LocalSpend keeps the Tauri macOS app, but the frontend is now mobile-first and i
 
 The category donut chart is lazy-loaded so the daily tracker does not load Recharts on first open. This keeps the main web bundle smaller for iPhone use while preserving the Summary chart.
 
+## Browser Persistence
+
+The hosted PWA stores profile data and compressed wallpapers in IndexedDB. Profile metadata remains a very small localStorage record, and temporary unfinished expense drafts use a separate expiring local key. Existing PWA profile payloads migrate from localStorage to IndexedDB on first read. Downloaded backups are not duplicated inside browser storage.
+
 ## Recurring Bill Occurrences
 
 Recurring reminders are derived from each rule's start date and cadence, not only from a mutable next-due pointer. Every scheduled date is handled independently: an exact matching expense records it, while a user discard stores that date in the rule's `discardedDates` list. This prevents duplicate reminders, preserves missed-cycle reminders after schedule edits, and keeps later occurrences independent.
+
+Materialized and reconciled bill expenses also store the originating rule id and scheduled occurrence date. This stable link means a later bill edit cannot resurrect an already-paid month. A manually entered matching bill with a changed amount is shown for explicit reconciliation instead of creating a silent duplicate.
 
 Discarding is persistent during normal use so the reminder stays gone. Any deliberate edit-and-save of that bill clears its discarded dates and recalculates reminders; exact matching expenses still suppress already-recorded occurrences.
 

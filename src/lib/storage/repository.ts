@@ -119,8 +119,8 @@ class BrowserRepository implements LocalSpendRepository {
       activeProfileId: profile.id,
       profiles: [...state.profiles, profile]
     };
+    await this.writeProfileData(profile.id, createDefaultProfileData());
     this.writeProfiles(next);
-    this.writeProfileData(profile.id, createDefaultProfileData());
     return next;
   }
 
@@ -160,6 +160,7 @@ class BrowserRepository implements LocalSpendRepository {
       profiles,
       activeProfileId: state.activeProfileId === profileId ? profiles[0]?.id ?? null : state.activeProfileId
     };
+    await deleteBrowserProfileData(profileId);
     localStorage.removeItem(dataKey(profileId));
     this.writeProfiles(next);
     return next;
@@ -170,19 +171,20 @@ class BrowserRepository implements LocalSpendRepository {
   }
 
   async saveProfileData(profileId: string, data: ProfileData): Promise<ProfileData> {
-    this.writeProfileData(profileId, data);
+    await this.writeProfileData(profileId, data);
     return data;
   }
 
   async resetProfileData(profileId: string): Promise<ProfileData> {
     const data = createDefaultProfileData();
-    this.writeProfileData(profileId, data);
+    await this.writeProfileData(profileId, data);
     return data;
   }
 
-  async saveProfileFile(profileId: string, kind: "backup" | "export", fileName: string, contents: string): Promise<string> {
-    localStorage.setItem(`localspend.file.${profileId}.${kind}.${fileName}`, contents);
-    return `browser-localStorage:${fileName}`;
+  async saveProfileFile(_profileId: string, _kind: "backup" | "export", fileName: string, _contents: string): Promise<string> {
+    // The browser download is the backup. Keeping another full copy in web storage
+    // wastes quota and can prevent later expense saves.
+    return `browser-download:${fileName}`;
   }
 
   async setAiSecret(profileId: string, provider: string, secret: string): Promise<boolean> {
@@ -204,7 +206,7 @@ class BrowserRepository implements LocalSpendRepository {
   }
 
   async dataRootPath(): Promise<string> {
-    return "browser localStorage fallback";
+    return supportsIndexedDb() ? "browser IndexedDB" : "browser localStorage fallback";
   }
 
   private readProfiles(): ProfilesState {
@@ -227,23 +229,96 @@ class BrowserRepository implements LocalSpendRepository {
     localStorage.setItem("localspend.profiles", JSON.stringify(state));
   }
 
-  private readProfileData(profileId: string): ProfileData {
+  private async readProfileData(profileId: string): Promise<ProfileData> {
+    if (supportsIndexedDb()) {
+      const stored = await readBrowserProfileData(profileId);
+      if (stored) {
+        return normalizeProfileData(stored);
+      }
+    }
+
     const raw = localStorage.getItem(dataKey(profileId));
     if (!raw) {
       const data = createDefaultProfileData();
-      this.writeProfileData(profileId, data);
+      await this.writeProfileData(profileId, data);
       return data;
     }
     try {
-      return normalizeProfileData(JSON.parse(raw) as Partial<ProfileData>);
+      const data = normalizeProfileData(JSON.parse(raw) as Partial<ProfileData>);
+      await this.writeProfileData(profileId, data);
+      if (supportsIndexedDb()) {
+        localStorage.removeItem(dataKey(profileId));
+      }
+      return data;
     } catch {
-      return createDefaultProfileData();
+      throw new Error("Stored LocalSpend data could not be read. Restore a backup before adding new spending.");
     }
   }
 
-  private writeProfileData(profileId: string, data: ProfileData): void {
+  private async writeProfileData(profileId: string, data: ProfileData): Promise<void> {
+    if (supportsIndexedDb()) {
+      await writeBrowserProfileData(profileId, data);
+      return;
+    }
     localStorage.setItem(dataKey(profileId), JSON.stringify(data));
   }
+}
+
+const BROWSER_DB_NAME = "localspend";
+const BROWSER_DB_VERSION = 1;
+const BROWSER_PROFILE_STORE = "profileData";
+let browserDbPromise: Promise<IDBDatabase> | null = null;
+
+function supportsIndexedDb(): boolean {
+  return typeof indexedDB !== "undefined";
+}
+
+function openBrowserDatabase(): Promise<IDBDatabase> {
+  if (browserDbPromise) return browserDbPromise;
+  browserDbPromise = new Promise((resolve, reject) => {
+    const request = indexedDB.open(BROWSER_DB_NAME, BROWSER_DB_VERSION);
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains(BROWSER_PROFILE_STORE)) {
+        request.result.createObjectStore(BROWSER_PROFILE_STORE);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error("Could not open browser storage."));
+    request.onblocked = () => reject(new Error("Browser storage is busy in another LocalSpend window."));
+  });
+  return browserDbPromise;
+}
+
+async function readBrowserProfileData(profileId: string): Promise<Partial<ProfileData> | null> {
+  const database = await openBrowserDatabase();
+  return new Promise((resolve, reject) => {
+    const request = database.transaction(BROWSER_PROFILE_STORE, "readonly").objectStore(BROWSER_PROFILE_STORE).get(profileId);
+    request.onsuccess = () => resolve((request.result as Partial<ProfileData> | undefined) ?? null);
+    request.onerror = () => reject(request.error ?? new Error("Could not read browser data."));
+  });
+}
+
+async function writeBrowserProfileData(profileId: string, data: ProfileData): Promise<void> {
+  const database = await openBrowserDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(BROWSER_PROFILE_STORE, "readwrite");
+    transaction.objectStore(BROWSER_PROFILE_STORE).put(data, profileId);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error ?? new Error("Could not save browser data."));
+    transaction.onabort = () => reject(transaction.error ?? new Error("Browser storage stopped the save."));
+  });
+}
+
+async function deleteBrowserProfileData(profileId: string): Promise<void> {
+  if (!supportsIndexedDb()) return;
+  const database = await openBrowserDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(BROWSER_PROFILE_STORE, "readwrite");
+    transaction.objectStore(BROWSER_PROFILE_STORE).delete(profileId);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error ?? new Error("Could not remove browser data."));
+    transaction.onabort = () => reject(transaction.error ?? new Error("Browser storage stopped the delete."));
+  });
 }
 
 function normalizeProfileData(data: Partial<ProfileData>): ProfileData {
@@ -270,7 +345,8 @@ function normalizeProfileData(data: Partial<ProfileData>): ProfileData {
       paymentMethods: data.appSettings?.paymentMethods?.length ? data.appSettings.paymentMethods : fallback.appSettings.paymentMethods,
       wallpapers,
       activeWallpaperId,
-      wallpaperOpacity: clampWallpaperOpacity(data.appSettings?.wallpaperOpacity)
+      wallpaperOpacity: clampWallpaperOpacity(data.appSettings?.wallpaperOpacity),
+      lastBackupAt: typeof data.appSettings?.lastBackupAt === "string" ? data.appSettings.lastBackupAt : null
     },
     aiSettings: {
       ...fallback.aiSettings,

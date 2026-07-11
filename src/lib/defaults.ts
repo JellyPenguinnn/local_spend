@@ -50,7 +50,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   paymentMethods: DEFAULT_PAYMENT_METHODS,
   wallpapers: [],
   activeWallpaperId: null,
-  wallpaperOpacity: 0.34
+  wallpaperOpacity: 0.34,
+  lastBackupAt: null
 };
 
 export const DEFAULT_AI_SETTINGS: AiSettings = {

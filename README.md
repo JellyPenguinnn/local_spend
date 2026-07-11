@@ -40,7 +40,7 @@ See [docs/PRIVACY.md](docs/PRIVACY.md) for the fuller privacy model.
 - Tauri 2 for the macOS desktop shell
 - React 19, TypeScript, and Vite for the frontend
 - SQLite for desktop local persistence
-- Browser local storage fallback for the hosted PWA
+- IndexedDB profile storage for the hosted PWA, with automatic migration from earlier localStorage data
 - Recharts for the category donut chart
 - Vitest for unit tests
 - ESLint for linting
@@ -156,7 +156,7 @@ profiles/
     exports/
 ```
 
-`profiles.json` stores profile metadata only. Spending records live in the active profile database. In browser/PWA mode, the app uses browser storage instead of SQLite so it can run from GitHub Pages.
+`profiles.json` stores profile metadata only. Spending records live in the active profile database. In browser/PWA mode, profile records and wallpapers use IndexedDB instead of SQLite so the app can run from GitHub Pages; earlier localStorage profile data migrates automatically on first launch.
 
 Each expense stores its original amount/currency and a dated base-currency value. The original value remains visible in transaction details, while Calendar, Summary, category distribution, and budgets use the stable base value. Historical expenses are not revalued later.
 

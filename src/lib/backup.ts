@@ -25,7 +25,7 @@ export function createBackup(profile: ProfileMeta, data: ProfileData): string {
   return `${JSON.stringify(backup, null, 2)}\n`;
 }
 
-export function restoreBackup(json: string): { data: ProfileData | null; error?: string } {
+export function restoreBackup(json: string): { data: ProfileData | null; error?: string; profileName?: string } {
   try {
     const parsed = JSON.parse(json) as Partial<LocalSpendBackup>;
     if (parsed.app !== "LocalSpend" || ![1, 2].includes(parsed.version ?? 0) || !parsed.data) {
@@ -63,7 +63,8 @@ export function restoreBackup(json: string): { data: ProfileData | null; error?:
           ...(data.aiSettings ?? {}),
           apiKeySaved: false
         }
-      }
+      },
+      profileName: typeof parsed.profile?.displayName === "string" ? parsed.profile.displayName : undefined
     };
   } catch {
     return { data: null, error: "The backup file is not valid JSON." };

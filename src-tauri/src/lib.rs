@@ -54,6 +54,10 @@ pub struct Expense {
     title: Option<String>,
     remark: Option<String>,
     payment_method: Option<String>,
+    #[serde(default)]
+    recurring_rule_id: Option<String>,
+    #[serde(default)]
+    recurring_occurrence_date: Option<String>,
     created_at: String,
     updated_at: String,
 }
@@ -100,6 +104,8 @@ pub struct AppSettings {
     wallpapers: Vec<WallpaperImage>,
     active_wallpaper_id: Option<String>,
     wallpaper_opacity: f64,
+    #[serde(default)]
+    last_backup_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -457,6 +463,8 @@ fn initialize_database(conn: &Connection) -> CmdResult<()> {
           title TEXT,
           remark TEXT,
           payment_method TEXT,
+          recurring_rule_id TEXT,
+          recurring_occurrence_date TEXT,
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL,
           FOREIGN KEY(category_id) REFERENCES categories(id)
@@ -512,12 +520,19 @@ fn initialize_database(conn: &Connection) -> CmdResult<()> {
     ensure_recurring_start_date(conn)?;
     ensure_recurring_discarded_dates(conn)?;
     ensure_expense_currency_snapshot(conn)?;
+    ensure_expense_recurring_link(conn)?;
     conn.execute(
         "INSERT OR IGNORE INTO schema_migrations(version, description, applied_at)
          VALUES (2, 'stable_multi_currency_expense_snapshots', datetime('now'))",
         [],
     )
     .map_err(|err| format!("Could not record multi-currency migration: {err}"))?;
+    conn.execute(
+        "INSERT OR IGNORE INTO schema_migrations(version, description, applied_at)
+         VALUES (3, 'stable_recurring_occurrence_links', datetime('now'))",
+        [],
+    )
+    .map_err(|err| format!("Could not record recurring occurrence migration: {err}"))?;
 
     let category_count: i64 = conn
         .query_row("SELECT COUNT(*) FROM categories", [], |row| row.get(0))
@@ -578,6 +593,25 @@ fn ensure_expense_currency_snapshot(conn: &Connection) -> CmdResult<()> {
         [],
     )
     .map_err(|err| format!("Could not backfill expense currency snapshots: {err}"))?;
+    Ok(())
+}
+
+fn ensure_expense_recurring_link(conn: &Connection) -> CmdResult<()> {
+    let mut stmt = conn
+        .prepare("PRAGMA table_info(expenses)")
+        .map_err(|err| format!("Could not inspect expenses schema: {err}"))?;
+    let columns = stmt
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|err| format!("Could not read expenses schema: {err}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|err| format!("Could not map expenses schema: {err}"))?;
+    drop(stmt);
+    for column in ["recurring_rule_id", "recurring_occurrence_date"] {
+        if !columns.iter().any(|existing| existing == column) {
+            conn.execute(&format!("ALTER TABLE expenses ADD COLUMN {column} TEXT"), [])
+                .map_err(|err| format!("Could not add expense {column}: {err}"))?;
+        }
+    }
     Ok(())
 }
 
@@ -720,8 +754,8 @@ fn persist_profile_data(conn: &mut Connection, data: &ProfileData) -> CmdResult<
 
     for expense in &data.expenses {
         tx.execute(
-            "INSERT INTO expenses(id, amount, currency, base_amount, base_currency, exchange_rate, exchange_rate_date, exchange_rate_source, date, category_id, title, remark, payment_method, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+            "INSERT INTO expenses(id, amount, currency, base_amount, base_currency, exchange_rate, exchange_rate_date, exchange_rate_source, date, category_id, title, remark, payment_method, recurring_rule_id, recurring_occurrence_date, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
             params![
                 expense.id,
                 expense.amount,
@@ -736,6 +770,8 @@ fn persist_profile_data(conn: &mut Connection, data: &ProfileData) -> CmdResult<
                 expense.title,
                 expense.remark,
                 expense.payment_method,
+                expense.recurring_rule_id,
+                expense.recurring_occurrence_date,
                 expense.created_at,
                 expense.updated_at
             ],
@@ -809,7 +845,7 @@ fn read_categories(conn: &Connection) -> CmdResult<Vec<Category>> {
 fn read_expenses(conn: &Connection) -> CmdResult<Vec<Expense>> {
     let mut stmt = conn
         .prepare(
-            "SELECT id, amount, currency, COALESCE(base_amount, amount), COALESCE(base_currency, currency), COALESCE(exchange_rate, 1), COALESCE(exchange_rate_date, date), COALESCE(exchange_rate_source, 'legacy'), date, category_id, title, remark, payment_method, created_at, updated_at
+            "SELECT id, amount, currency, COALESCE(base_amount, amount), COALESCE(base_currency, currency), COALESCE(exchange_rate, 1), COALESCE(exchange_rate_date, date), COALESCE(exchange_rate_source, 'legacy'), date, category_id, title, remark, payment_method, recurring_rule_id, recurring_occurrence_date, created_at, updated_at
              FROM expenses ORDER BY date DESC, created_at DESC",
         )
         .map_err(|err| format!("Could not prepare expenses query: {err}"))?;
@@ -829,8 +865,10 @@ fn read_expenses(conn: &Connection) -> CmdResult<Vec<Expense>> {
                 title: row.get(10)?,
                 remark: row.get(11)?,
                 payment_method: row.get(12)?,
-                created_at: row.get(13)?,
-                updated_at: row.get(14)?,
+                recurring_rule_id: row.get(13)?,
+                recurring_occurrence_date: row.get(14)?,
+                created_at: row.get(15)?,
+                updated_at: row.get(16)?,
             })
         })
         .map_err(|err| format!("Could not read expenses: {err}"))?;
@@ -922,6 +960,7 @@ fn read_app_settings(conn: &Connection) -> CmdResult<AppSettings> {
         .and_then(|value| value.parse::<f64>().ok())
         .map(clamp_wallpaper_opacity)
         .unwrap_or(0.34);
+    let last_backup_at = read_setting(conn, "lastBackupAt")?.and_then(|value| if value.is_empty() { None } else { Some(value) });
     Ok(AppSettings {
         currency,
         enabled_currencies,
@@ -932,6 +971,7 @@ fn read_app_settings(conn: &Connection) -> CmdResult<AppSettings> {
         wallpapers,
         active_wallpaper_id,
         wallpaper_opacity,
+        last_backup_at,
     })
 }
 
@@ -987,6 +1027,11 @@ fn write_app_settings(conn: &Connection, settings: &AppSettings) -> CmdResult<()
         params![clamp_wallpaper_opacity(settings.wallpaper_opacity).to_string()],
     )
     .map_err(|err| format!("Could not write wallpaper opacity: {err}"))?;
+    conn.execute(
+        "INSERT OR REPLACE INTO app_settings(key, value) VALUES ('lastBackupAt', ?1)",
+        params![settings.last_backup_at.clone().unwrap_or_default()],
+    )
+    .map_err(|err| format!("Could not write backup timestamp: {err}"))?;
     Ok(())
 }
 
@@ -1049,6 +1094,7 @@ fn default_app_settings() -> AppSettings {
         wallpapers: Vec::new(),
         active_wallpaper_id: None,
         wallpaper_opacity: 0.34,
+        last_backup_at: None,
     }
 }
 
@@ -1068,7 +1114,7 @@ fn normalize_enabled_currencies(currencies: Vec<String>, base_currency: &str) ->
 }
 
 fn default_accent_palette() -> Vec<String> {
-    vec!["#2f5f8f", "#5d8b68", "#347f82", "#565d66", "#b76e79", "#725d8e"]
+    vec!["#2f5f8f", "#5d8b68", "#347f82", "#565d66", "#b76e79", "#725d8e", "#c6794f", "#7a6a42"]
         .into_iter()
         .map(String::from)
         .collect()
@@ -1084,7 +1130,7 @@ fn normalize_accent_palette(colors: Vec<String>) -> Vec<String> {
         if is_hex && !palette.contains(&normalized) {
             palette.push(normalized);
         }
-        if palette.len() >= 6 {
+        if palette.len() >= 8 {
             break;
         }
     }
@@ -1216,7 +1262,7 @@ mod tests {
         assert_eq!(data.categories.len(), 14);
         assert_eq!(data.app_settings.currency, "SGD");
         assert_eq!(data.app_settings.accent_color, "#315fbd");
-        assert_eq!(data.app_settings.accent_palette.len(), 6);
+        assert_eq!(data.app_settings.accent_palette.len(), 8);
         assert_eq!(data.ai_settings.provider, "none");
     }
 
@@ -1239,6 +1285,8 @@ mod tests {
             title: Some("Lunch".to_string()),
             remark: None,
             payment_method: Some("PayNow".to_string()),
+            recurring_rule_id: Some("rule_test".to_string()),
+            recurring_occurrence_date: Some("2026-07-07".to_string()),
             created_at: "2026-07-07T00:00:00Z".to_string(),
             updated_at: "2026-07-07T00:00:00Z".to_string(),
         });
@@ -1263,6 +1311,8 @@ mod tests {
         let loaded = load_profile_data(&conn).expect("reload data");
         assert_eq!(loaded.expenses.len(), 1);
         assert_eq!(loaded.expenses[0].title.as_deref(), Some("Lunch"));
+        assert_eq!(loaded.expenses[0].recurring_rule_id.as_deref(), Some("rule_test"));
+        assert_eq!(loaded.expenses[0].recurring_occurrence_date.as_deref(), Some("2026-07-07"));
         assert_eq!(loaded.categories.len(), 14);
         assert_eq!(loaded.recurring_rules[0].discarded_dates, vec!["2026-06-05"]);
     }

@@ -11,6 +11,7 @@ export interface RecurringOccurrence {
   ruleId: string;
   date: string;
   rule: RecurringRule;
+  relatedExpense?: Expense;
 }
 
 export function nextRecurringDate(rule: RecurringRule, fromDate = rule.nextDate): string {
@@ -30,6 +31,9 @@ export function hasRecordedRecurringExpense(expenses: Expense[], rule: Recurring
   const title = rule.title.trim().toLowerCase();
   const paymentMethod = rule.paymentMethod ?? "";
   return expenses.some((expense) => {
+    if (expense.recurringRuleId === rule.id && expense.recurringOccurrenceDate === occurrenceDate) {
+      return true;
+    }
     return (
       expense.date === occurrenceDate &&
       expense.amount === rule.amount &&
@@ -45,6 +49,24 @@ export function getDueRecurringOccurrences(rules: RecurringRule[], expenses: Exp
   return rules
     .flatMap((rule) => (rule.isActive ? getRuleOccurrencesThrough(rule, today) : []))
     .filter(({ rule, date }) => !isOccurrenceHandled(rule, expenses, date))
+    .map((occurrence) => ({
+      ...occurrence,
+      relatedExpense: findRecurringExpenseCandidate(expenses, occurrence.rule, occurrence.date) ?? undefined
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.rule.title.localeCompare(b.rule.title));
+}
+
+export function getUpcomingRecurringOccurrences(
+  rules: RecurringRule[],
+  expenses: Expense[],
+  today: string,
+  windowDays = 7
+): RecurringOccurrence[] {
+  const endDate = addDays(today, windowDays);
+  const overdueRuleIds = new Set(getDueRecurringOccurrences(rules, expenses, today).map((occurrence) => occurrence.ruleId));
+  return rules
+    .filter((rule) => rule.isActive && !overdueRuleIds.has(rule.id))
+    .flatMap((rule) => getRuleOccurrencesThrough(rule, endDate).filter((occurrence) => occurrence.date > today && !isOccurrenceHandled(rule, expenses, occurrence.date)).slice(0, 1))
     .sort((a, b) => a.date.localeCompare(b.date) || a.rule.title.localeCompare(b.rule.title));
 }
 
@@ -100,6 +122,8 @@ export function recordRecurringOccurrence(
         title: rule.title,
         remark: rule.remark ?? null,
         paymentMethod: rule.paymentMethod ?? null,
+        recurringRuleId: rule.id,
+        recurringOccurrenceDate: occurrenceDate,
         createdAt: timestamp,
         updatedAt: timestamp
       };
@@ -121,6 +145,41 @@ export function recordRecurringOccurrence(
     },
     created
   };
+}
+
+export function reconcileRecurringOccurrence(data: ProfileData, ruleId: string, occurrenceDate: string, expenseId: string, today: string): ProfileData {
+  const rule = data.recurringRules.find((item) => item.id === ruleId);
+  const expense = data.expenses.find((item) => item.id === expenseId);
+  if (!rule || !expense || compareIsoDates(occurrenceDate, today) > 0 || !isScheduledOccurrence(rule, occurrenceDate)) {
+    return data;
+  }
+  const candidate = findRecurringExpenseCandidate(data.expenses, rule, occurrenceDate);
+  if (!candidate || candidate.id !== expenseId) return data;
+  const timestamp = nowIso();
+  const expenses = data.expenses.map((item) =>
+    item.id === expenseId
+      ? { ...item, recurringRuleId: rule.id, recurringOccurrenceDate: occurrenceDate, updatedAt: timestamp }
+      : item
+  );
+  const updatedRule = resolveRecurringRuleNextDate({ ...rule, updatedAt: timestamp }, expenses);
+  return {
+    ...data,
+    expenses,
+    recurringRules: data.recurringRules.map((item) => (item.id === ruleId ? updatedRule : item))
+  };
+}
+
+export function linkRecordedRecurringExpenses(expenses: Expense[], rule: RecurringRule): Expense[] {
+  return expenses.map((expense) => {
+    if (expense.recurringRuleId || !isScheduledOccurrence(rule, expense.date) || !isExactRecurringExpense(expense, rule)) {
+      return expense;
+    }
+    return {
+      ...expense,
+      recurringRuleId: rule.id,
+      recurringOccurrenceDate: expense.date
+    };
+  });
 }
 
 export function discardRecurringOccurrence(data: ProfileData, ruleId: string, occurrenceDate: string, today: string): ProfileData {
@@ -187,4 +246,30 @@ function isScheduledOccurrence(rule: RecurringRule, targetDate: string): boolean
     date = nextRecurringDate(rule, date);
   }
   return false;
+}
+
+function findRecurringExpenseCandidate(expenses: Expense[], rule: RecurringRule, occurrenceDate: string): Expense | null {
+  const title = rule.title.trim().toLowerCase();
+  const paymentMethod = rule.paymentMethod ?? "";
+  return (
+    expenses.find(
+      (expense) =>
+        expense.date === occurrenceDate &&
+        (!expense.recurringRuleId || expense.recurringRuleId === rule.id) &&
+        expense.currency === rule.currency &&
+        (expense.title ?? "").trim().toLowerCase() === title &&
+        expense.categoryId === rule.categoryId &&
+        (expense.paymentMethod ?? "") === paymentMethod
+    ) ?? null
+  );
+}
+
+function isExactRecurringExpense(expense: Expense, rule: RecurringRule): boolean {
+  return (
+    expense.amount === rule.amount &&
+    expense.currency === rule.currency &&
+    (expense.title ?? "").trim().toLowerCase() === rule.title.trim().toLowerCase() &&
+    expense.categoryId === rule.categoryId &&
+    (expense.paymentMethod ?? "") === (rule.paymentMethod ?? "")
+  );
 }

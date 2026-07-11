@@ -63,6 +63,7 @@
 - Verified lint, TypeScript/web build, JS tests, Rust SQLite tests, and Tauri `.app` build.
 - Added stable mixed-currency expenses: original and base values, dated reference/manual conversion, SGD/MYR quick selection, base-safe analytics and budgets, SQLite/browser migrations, dual-value details, and lossless CSV/JSON portability.
 - Added currency-aware recurring bills and cleaner form navigation: bills use enabled spending currencies, foreign occurrences save dated conversion snapshots, and Today/Calendar/Bills forms use compact destination-labelled back actions above a single bottom Save action.
+- Added the post-v1 reliability and retrieval pass: confirmed persistence before save feedback, recoverable per-profile drafts, focused mobile form subviews, Calendar transaction search with collapsed filters, visible merchant-memory suggestions, low-confidence NLP checks, stable recurring occurrence links with changed-amount reconciliation, seven-day upcoming bills, IndexedDB migration, first-launch restore, backup freshness, concise month comparison, and accessibility focus/live-status polish.
 - Unified the final form polish: all form navigation now says `Back`, Calendar edit no longer adds a redundant heading, and bill amount/currency uses the exact same unclipped control as Today.
 
 ## Follow-Up Polish

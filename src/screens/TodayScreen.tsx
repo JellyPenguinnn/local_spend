@@ -1,11 +1,18 @@
 import { useMemo, useState } from "react";
-import { CalendarDays, Plus } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronUp, Plus } from "lucide-react";
 import { getDailyTotals } from "../lib/analytics";
 import { fallbackCategoryId } from "../lib/categories";
 import { formatLocalIsoDate, parseLocalDate } from "../lib/date";
+import { clearExpenseDraft, expenseDraftKey } from "../lib/drafts";
 import { formatMoney } from "../lib/money";
 import { mostUsedPaymentMethod } from "../lib/payments";
-import { discardRecurringOccurrence, getDueRecurringOccurrences, recordRecurringOccurrence } from "../lib/recurring";
+import {
+  discardRecurringOccurrence,
+  getDueRecurringOccurrences,
+  getUpcomingRecurringOccurrences,
+  reconcileRecurringOccurrence,
+  recordRecurringOccurrence
+} from "../lib/recurring";
 import { parseExpenseWithAiOrLocal, type AiSecretStore } from "../lib/ai/providers";
 import type { Expense, ExpenseDraft, ProfileData, RecurringCadence } from "../lib/types";
 import { EmptyState } from "../components/EmptyState";
@@ -17,10 +24,11 @@ import { NaturalQuickAdd } from "../components/NaturalQuickAdd";
 import { fetchReferenceRate, latestCachedRate, latestKnownRate, normalizeCurrencyCode } from "../lib/currencies";
 
 interface TodayScreenProps {
+  profileId: string;
   data: ProfileData;
-  saveData: (data: ProfileData) => Promise<void>;
-  upsertExpense: (expense: Expense) => Promise<void>;
-  deleteExpense: (expenseId: string) => Promise<void>;
+  saveData: (data: ProfileData) => Promise<boolean>;
+  upsertExpense: (expense: Expense) => Promise<boolean>;
+  deleteExpense: (expenseId: string) => Promise<boolean>;
   secrets: AiSecretStore;
 }
 
@@ -31,18 +39,20 @@ const CADENCE_LABELS: Record<RecurringCadence, string> = {
   annually: "Annually"
 };
 
-export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secrets }: TodayScreenProps) {
+export function TodayScreen({ profileId, data, saveData, upsertExpense, deleteExpense, secrets }: TodayScreenProps) {
   const today = formatLocalIsoDate();
   const todayLabel = new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short", year: "numeric" }).format(parseLocalDate(today));
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [quickText, setQuickText] = useState("");
   const [quickDraft, setQuickDraft] = useState<Partial<ExpenseDraft> | undefined>();
   const [quickMessage, setQuickMessage] = useState("");
+  const [quickCategoryNeedsReview, setQuickCategoryNeedsReview] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [isEntryOpen, setIsEntryOpen] = useState(false);
   const [pendingDiscardOccurrenceId, setPendingDiscardOccurrenceId] = useState<string | null>(null);
   const [recordingOccurrenceId, setRecordingOccurrenceId] = useState<string | null>(null);
   const [billRecordError, setBillRecordError] = useState<{ occurrenceId: string; message: string } | null>(null);
+  const [showUpcoming, setShowUpcoming] = useState(false);
   const todayExpenses = useMemo(
     () => data.expenses.filter((expense) => expense.date === today).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [data.expenses, today]
@@ -52,6 +62,11 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
     () => getDueRecurringOccurrences(data.recurringRules, data.expenses, today),
     [data.expenses, data.recurringRules, today]
   );
+  const upcomingOccurrences = useMemo(
+    () => getUpcomingRecurringOccurrences(data.recurringRules, data.expenses, today, 7),
+    [data.expenses, data.recurringRules, today]
+  );
+  const activeDraftKey = expenseDraftKey(profileId, editingExpense ? `edit.${editingExpense.id}` : `today.${today}`);
 
   async function parseQuickAdd() {
     if (!quickText.trim()) {
@@ -76,6 +91,7 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
         remark: parsed.source === "ai" ? "AI suggestion" : "",
         paymentMethod: parsed.paymentMethod ?? mostUsedPaymentMethod(data.expenses, data.appSettings.paymentMethods)
       });
+      setQuickCategoryNeedsReview(!parsed.categoryId || (parsed.categoryConfidence ?? 0) < 0.72);
       setIsEntryOpen(true);
       setQuickMessage(parsed.source === "ai" ? "AI suggestion ready. Check it before saving." : "Draft ready. Check it before saving.");
     } finally {
@@ -101,31 +117,44 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
         return;
       }
       const result = recordRecurringOccurrence(data, ruleId, occurrenceDate, today, conversion);
-      await saveData(result.data);
-      setPendingDiscardOccurrenceId(null);
+      const saved = await saveData(result.data);
+      if (saved) setPendingDiscardOccurrenceId(null);
     } finally {
       setRecordingOccurrenceId(null);
     }
   }
 
   async function discardBill(ruleId: string, occurrenceDate: string) {
-    await saveData(discardRecurringOccurrence(data, ruleId, occurrenceDate, today));
-    setPendingDiscardOccurrenceId(null);
-    setBillRecordError(null);
+    const saved = await saveData(discardRecurringOccurrence(data, ruleId, occurrenceDate, today));
+    if (saved) {
+      setPendingDiscardOccurrenceId(null);
+      setBillRecordError(null);
+    }
+  }
+
+  async function reconcileRecordedBill(ruleId: string, occurrenceDate: string, expenseId: string) {
+    const saved = await saveData(reconcileRecurringOccurrence(data, ruleId, occurrenceDate, expenseId, today));
+    if (saved) {
+      setPendingDiscardOccurrenceId(null);
+      setBillRecordError(null);
+    }
   }
 
   function openEntry(expense?: Expense) {
     setEditingExpense(expense ?? null);
     setQuickDraft(undefined);
     setQuickMessage("");
+    setQuickCategoryNeedsReview(false);
     setIsEntryOpen(true);
   }
 
   function closeEntry() {
+    clearExpenseDraft(activeDraftKey);
     setEditingExpense(null);
     setQuickDraft(undefined);
     setQuickText("");
     setQuickMessage("");
+    setQuickCategoryNeedsReview(false);
     setIsEntryOpen(false);
   }
 
@@ -165,6 +194,11 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
                       {category?.name ?? "Category"} · {item.paymentMethod || "Payment"} · {CADENCE_LABELS[item.cadence]}
                     </span>
                     <span>Due {formatDateLabel(occurrence.date)}</span>
+                    {occurrence.relatedExpense && occurrence.relatedExpense.amount !== item.amount && (
+                      <span className="due-amount-mismatch">
+                        Recorded {formatMoney(occurrence.relatedExpense.amount, occurrence.relatedExpense.currency)} · expected {formatMoney(item.amount, item.currency)}
+                      </span>
+                    )}
                     {billRecordError?.occurrenceId === occurrence.id && <span className="due-rate-error">{billRecordError.message}</span>}
                   </div>
                   <strong>{formatMoney(item.amount, item.currency || data.appSettings.currency)}</strong>
@@ -183,9 +217,20 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
                         <button className="secondary-button" type="button" onClick={() => setPendingDiscardOccurrenceId(occurrence.id)}>
                           Discard
                         </button>
-                        <button className="primary-button" type="button" disabled={isRecording} onClick={() => void recordBill(item.id, occurrence.date)}>
-                          {isRecording ? "Recording…" : "Record"}
-                        </button>
+                        {occurrence.relatedExpense && occurrence.relatedExpense.amount !== item.amount ? (
+                          <>
+                            <button className="secondary-button" type="button" disabled={isRecording} onClick={() => void recordBill(item.id, occurrence.date)}>
+                              Record expected
+                            </button>
+                            <button className="primary-button" type="button" onClick={() => void reconcileRecordedBill(item.id, occurrence.date, occurrence.relatedExpense!.id)}>
+                              Use recorded
+                            </button>
+                          </>
+                        ) : (
+                          <button className="primary-button" type="button" disabled={isRecording} onClick={() => void recordBill(item.id, occurrence.date)}>
+                            {isRecording ? "Recording…" : "Record"}
+                          </button>
+                        )}
                       </>
                     )}
                   </div>
@@ -193,6 +238,36 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
               );
             })}
           </div>
+        </section>
+      )}
+
+      {upcomingOccurrences.length > 0 && (
+        <section className="panel upcoming-preview-panel">
+          <button className="upcoming-toggle" type="button" onClick={() => setShowUpcoming((value) => !value)} aria-expanded={showUpcoming}>
+            <span>
+              <strong>Upcoming</strong>
+              <small>Next 7 days · {upcomingOccurrences.length}</small>
+            </span>
+            {showUpcoming ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          </button>
+          {showUpcoming && (
+            <div className="upcoming-list compact-upcoming-list">
+              {upcomingOccurrences.map((occurrence) => {
+                const item = occurrence.rule;
+                const category = data.categories.find((entry) => entry.id === item.categoryId);
+                return (
+                  <article className="upcoming-row" key={occurrence.id}>
+                    <CategoryChip category={category} label="" compact />
+                    <div>
+                      <strong>{item.title}</strong>
+                      <span>{formatDateLabel(occurrence.date)} · {CADENCE_LABELS[item.cadence]}</span>
+                    </div>
+                    <strong>{formatMoney(item.amount, item.currency || data.appSettings.currency)}</strong>
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </section>
       )}
 
@@ -210,6 +285,8 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
             hideDate
             hideTitleRow
             autoFocusAmount
+            draftStorageKey={activeDraftKey}
+            initialCategoryNeedsReview={quickCategoryNeedsReview}
             afterAmount={
               !editingExpense ? (
                 <NaturalQuickAdd
@@ -224,14 +301,8 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
             }
             saveLabel="Save"
             onCancelEdit={closeEntry}
-            onSave={(expense) => {
-              void upsertExpense(expense);
-              setEditingExpense(null);
-              setQuickDraft(undefined);
-              setQuickText("");
-              setQuickMessage("");
-              setIsEntryOpen(false);
-            }}
+            onSave={(expense) => upsertExpense(expense)}
+            onSaved={closeEntry}
           />
         </section>
         )}

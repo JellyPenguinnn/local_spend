@@ -34,7 +34,10 @@ export function NaturalQuickAdd({ value, message, isParsing = false, aiEnabled =
             placeholder={NATURAL_ENTRY_EXAMPLE}
             onChange={(event) => onChange(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter") onDraft();
+              if (event.key === "Enter") {
+                event.preventDefault();
+                onDraft();
+              }
             }}
           />
           <button type="button" className="secondary-button" onClick={onDraft} disabled={isParsing}>

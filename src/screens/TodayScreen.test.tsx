@@ -6,16 +6,18 @@ import { TodayScreen } from "./TodayScreen";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  localStorage.clear();
 });
 
 describe("TodayScreen entry flow", () => {
   it("focuses amount while keeping natural entry visible as an alternative", () => {
     render(
       <TodayScreen
+        profileId="profile_test"
         data={createDefaultProfileData()}
-        saveData={vi.fn().mockResolvedValue(undefined)}
-        upsertExpense={vi.fn().mockResolvedValue(undefined)}
-        deleteExpense={vi.fn().mockResolvedValue(undefined)}
+        saveData={vi.fn().mockResolvedValue(true)}
+        upsertExpense={vi.fn().mockResolvedValue(true)}
+        deleteExpense={vi.fn().mockResolvedValue(true)}
         secrets={{ getSecret: vi.fn().mockResolvedValue(null) }}
       />
     );
@@ -89,10 +91,11 @@ describe("TodayScreen entry flow", () => {
     ];
     render(
       <TodayScreen
+        profileId="profile_test"
         data={data}
-        saveData={vi.fn().mockResolvedValue(undefined)}
-        upsertExpense={vi.fn().mockResolvedValue(undefined)}
-        deleteExpense={vi.fn().mockResolvedValue(undefined)}
+        saveData={vi.fn().mockResolvedValue(true)}
+        upsertExpense={vi.fn().mockResolvedValue(true)}
+        deleteExpense={vi.fn().mockResolvedValue(true)}
         secrets={{ getSecret: vi.fn().mockResolvedValue(null) }}
       />
     );
@@ -110,13 +113,14 @@ describe("TodayScreen entry flow", () => {
       "fetch",
       vi.fn().mockResolvedValue({ ok: true, json: async () => ({ date: "2026-07-10", base: "MYR", quote: "SGD", rate: 0.317 }) })
     );
-    const upsertExpense = vi.fn().mockResolvedValue(undefined);
+    const upsertExpense = vi.fn().mockResolvedValue(true);
     render(
       <TodayScreen
+        profileId="profile_test"
         data={createDefaultProfileData()}
-        saveData={vi.fn().mockResolvedValue(undefined)}
+        saveData={vi.fn().mockResolvedValue(true)}
         upsertExpense={upsertExpense}
-        deleteExpense={vi.fn().mockResolvedValue(undefined)}
+        deleteExpense={vi.fn().mockResolvedValue(true)}
         secrets={{ getSecret: vi.fn().mockResolvedValue(null) }}
       />
     );
@@ -166,14 +170,15 @@ describe("TodayScreen entry flow", () => {
         updatedAt: `${today}T00:00:00.000Z`
       }
     ];
-    const saveData = vi.fn().mockResolvedValue(undefined);
+    const saveData = vi.fn().mockResolvedValue(true);
 
     render(
       <TodayScreen
+        profileId="profile_test"
         data={data}
         saveData={saveData}
-        upsertExpense={vi.fn().mockResolvedValue(undefined)}
-        deleteExpense={vi.fn().mockResolvedValue(undefined)}
+        upsertExpense={vi.fn().mockResolvedValue(true)}
+        deleteExpense={vi.fn().mockResolvedValue(true)}
         secrets={{ getSecret: vi.fn().mockResolvedValue(null) }}
       />
     );
@@ -187,5 +192,85 @@ describe("TodayScreen entry flow", () => {
       baseCurrency: "SGD",
       exchangeRateSource: "ecb-reference"
     });
+  });
+
+  it("keeps the form and values when persistence fails", async () => {
+    render(
+      <TodayScreen
+        profileId="profile_failure"
+        data={createDefaultProfileData()}
+        saveData={vi.fn().mockResolvedValue(false)}
+        upsertExpense={vi.fn().mockResolvedValue(false)}
+        deleteExpense={vi.fn().mockResolvedValue(false)}
+        secrets={{ getSecret: vi.fn().mockResolvedValue(null) }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "8.40" } });
+    fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Lunch" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Your entry is still here");
+    expect(screen.getByLabelText("Amount")).toHaveValue("8.40");
+    expect(screen.getByLabelText("Description")).toHaveValue("Lunch");
+  });
+
+  it("restores an unfinished draft after leaving and returning", () => {
+    const props = {
+      profileId: "profile_draft",
+      data: createDefaultProfileData(),
+      saveData: vi.fn().mockResolvedValue(true),
+      upsertExpense: vi.fn().mockResolvedValue(true),
+      deleteExpense: vi.fn().mockResolvedValue(true),
+      secrets: { getSecret: vi.fn().mockResolvedValue(null) }
+    };
+    const first = render(<TodayScreen {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "4.60" } });
+    fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Kopi" } });
+    first.unmount();
+
+    render(<TodayScreen {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(screen.getByLabelText("Amount")).toHaveValue("4.60");
+    expect(screen.getByLabelText("Description")).toHaveValue("Kopi");
+  });
+
+  it("surfaces a previous merchant match inside the focused form", () => {
+    const data = createDefaultProfileData();
+    data.expenses = [
+      {
+        id: "exp_grab_history",
+        amount: 12,
+        currency: "SGD",
+        baseAmount: 12,
+        baseCurrency: "SGD",
+        exchangeRate: 1,
+        exchangeRateDate: "2026-07-10",
+        exchangeRateSource: "base",
+        date: "2026-07-10",
+        categoryId: "cat_transport",
+        title: "Grab",
+        remark: null,
+        paymentMethod: "PayNow",
+        createdAt: "2026-07-10T10:00:00.000Z",
+        updatedAt: "2026-07-10T10:00:00.000Z"
+      }
+    ];
+    render(
+      <TodayScreen
+        profileId="profile_memory"
+        data={data}
+        saveData={vi.fn().mockResolvedValue(true)}
+        upsertExpense={vi.fn().mockResolvedValue(true)}
+        deleteExpense={vi.fn().mockResolvedValue(true)}
+        secrets={{ getSecret: vi.fn().mockResolvedValue(null) }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Grab" } });
+    expect(screen.getByRole("button", { name: "Matched previous entry Transport · PayNow" })).toBeInTheDocument();
   });
 });

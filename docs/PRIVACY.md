@@ -25,6 +25,8 @@ profiles/<profile-id>/localspend.sqlite
 
 The active profile id controls which database file is opened. Switching profiles reloads from a different SQLite file, so records are not shared across profiles.
 
+In the hosted PWA, each browser installation keeps its own profile data in IndexedDB under the LocalSpend site origin. Earlier localStorage profile payloads migrate locally into IndexedDB; no migration data is sent to a server. Deleting the PWA or clearing Safari website data can still remove this local copy, so JSON backups remain important.
+
 ## Wallpapers
 
 Custom wallpapers are user-imported, compressed, and saved locally with the active profile. LocalSpend keeps at most 5 wallpaper images per profile to control storage use. The selected wallpaper and light/dark appearance mode are profile settings. Wallpapers may be included in JSON backups for that profile.

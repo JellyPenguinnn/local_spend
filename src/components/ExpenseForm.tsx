@@ -5,6 +5,7 @@ import { suggestCategoryLocal } from "../lib/categories";
 import { fetchReferenceRate, latestCachedRate, latestKnownRate, normalizeCurrencyCode } from "../lib/currencies";
 import { parseLocalDate } from "../lib/date";
 import { createId, nowIso } from "../lib/defaults";
+import { clearExpenseDraft, loadExpenseDraft, saveExpenseDraft } from "../lib/drafts";
 import { parseMoney, roundMoney } from "../lib/money";
 import { mostUsedPaymentMethod } from "../lib/payments";
 import type { AppSettings, Category, ExchangeRateSource, Expense, ExpenseDraft } from "../lib/types";
@@ -22,7 +23,10 @@ interface ExpenseFormProps {
   autoFocusAmount?: boolean;
   afterAmount?: ReactNode;
   saveLabel?: string;
-  onSave: (expense: Expense, mode: "add" | "edit") => void;
+  draftStorageKey?: string;
+  initialCategoryNeedsReview?: boolean;
+  onSave: (expense: Expense, mode: "add" | "edit") => Promise<boolean>;
+  onSaved?: () => void;
   onCancelEdit?: () => void;
 }
 
@@ -39,25 +43,36 @@ export function ExpenseForm({
   autoFocusAmount = false,
   afterAmount,
   saveLabel,
+  draftStorageKey,
+  initialCategoryNeedsReview = false,
   onSave,
+  onSaved,
   onCancelEdit
 }: ExpenseFormProps) {
   const amountInputRef = useRef<HTMLInputElement>(null);
+  const dateInputRef = useRef<HTMLInputElement>(null);
+  const categoryInputRef = useRef<HTMLSelectElement>(null);
   const defaultCategoryId = categories.find((category) => category.name.toLowerCase() === "food & drinks")?.id ?? categories[0]?.id ?? "";
   const defaultPaymentMethod = mostUsedPaymentMethod(expenses, settings.paymentMethods);
-  const [draft, setDraft] = useState<ExpenseDraft>(() => ({
-    amount: "",
-    currency: settings.currency,
-    baseAmount: "",
-    date: defaultDate,
-    categoryId: defaultCategoryId,
-    title: "",
-    remark: "",
-    paymentMethod: defaultPaymentMethod,
-    ...initialDraft
-  }));
+  const [draft, setDraft] = useState<ExpenseDraft>(() => {
+    const persisted = draftStorageKey ? loadExpenseDraft(draftStorageKey) : null;
+    return {
+      amount: "",
+      currency: settings.currency,
+      baseAmount: "",
+      date: defaultDate,
+      categoryId: defaultCategoryId,
+      title: "",
+      remark: "",
+      paymentMethod: defaultPaymentMethod,
+      ...initialDraft,
+      ...persisted
+    };
+  });
   const [error, setError] = useState("");
   const [didSave, setDidSave] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [categoryNeedsReview, setCategoryNeedsReview] = useState(initialCategoryNeedsReview);
   const [rateState, setRateState] = useState<{ rate: number; date: string; source: ExchangeRateSource } | null>(null);
   const [rateStatus, setRateStatus] = useState<"idle" | "loading" | "ready" | "unavailable">("idle");
   const [isBaseAmountManual, setIsBaseAmountManual] = useState(false);
@@ -74,6 +89,7 @@ export function ExpenseForm({
 
   useEffect(() => {
     if (editingExpense) {
+      const persisted = draftStorageKey ? loadExpenseDraft(draftStorageKey) : null;
       setDraft({
         amount: editingExpense.amount,
         currency: editingExpense.currency,
@@ -82,7 +98,8 @@ export function ExpenseForm({
         categoryId: editingExpense.categoryId,
         title: editingExpense.title ?? "",
         remark: editingExpense.remark ?? "",
-        paymentMethod: editingExpense.paymentMethod ?? defaultPaymentMethod
+        paymentMethod: editingExpense.paymentMethod ?? defaultPaymentMethod,
+        ...persisted
       });
       setRateState({
         rate: editingExpense.exchangeRate,
@@ -92,7 +109,7 @@ export function ExpenseForm({
       setRateStatus("ready");
       setIsBaseAmountManual(editingExpense.exchangeRateSource === "manual");
     }
-  }, [defaultPaymentMethod, editingExpense]);
+  }, [defaultPaymentMethod, draftStorageKey, editingExpense]);
 
   useEffect(() => {
     if (!editingExpense) {
@@ -109,6 +126,16 @@ export function ExpenseForm({
       }));
     }
   }, [defaultDate, editingExpense, initialDraft]);
+
+  useEffect(() => {
+    setCategoryNeedsReview(initialCategoryNeedsReview);
+  }, [initialCategoryNeedsReview, initialDraft]);
+
+  useEffect(() => {
+    if (draftStorageKey && !didSave) {
+      saveExpenseDraft(draftStorageKey, draft);
+    }
+  }, [didSave, draft, draftStorageKey]);
 
   useEffect(() => {
     if (autoFocusAmount && !editingExpense) {
@@ -183,25 +210,33 @@ export function ExpenseForm({
     setError("");
   }
 
+  function updateCategory(value: string) {
+    update("categoryId", value);
+    setCategoryNeedsReview(false);
+  }
+
   function updateBaseAmount(value: string) {
     setDraft((current) => ({ ...current, baseAmount: value }));
     setIsBaseAmountManual(true);
     setError("");
   }
 
-  function submit() {
-    if (didSave) return;
+  async function submit() {
+    if (didSave || isSaving) return;
     const parsedAmount = typeof draft.amount === "number" ? draft.amount : parseMoney(String(draft.amount));
     if (parsedAmount === null) {
       setError("Enter a positive amount, up to 2 decimals.");
+      amountInputRef.current?.focus();
       return;
     }
     if (!draft.date) {
       setError("Choose a spending date.");
+      dateInputRef.current?.focus();
       return;
     }
     if (!draft.categoryId) {
       setError("Choose a category.");
+      categoryInputRef.current?.focus();
       return;
     }
     const parsedBaseAmount = isForeignCurrency
@@ -229,26 +264,22 @@ export function ExpenseForm({
       title: draft.title.trim() || null,
       remark: draft.remark.trim() || null,
       paymentMethod: draft.paymentMethod || null,
+      recurringRuleId: editingExpense?.recurringRuleId ?? null,
+      recurringOccurrenceDate: editingExpense?.recurringOccurrenceDate ?? null,
       createdAt: editingExpense?.createdAt ?? timestamp,
       updatedAt: timestamp
     };
+    setIsSaving(true);
+    const saved = await onSave(expense, editingExpense ? "edit" : "add");
+    if (!saved) {
+      setError("Could not save. Your entry is still here so you can try again.");
+      setIsSaving(false);
+      return;
+    }
+    clearExpenseDraft(draftStorageKey);
     setDidSave(true);
-    window.setTimeout(() => {
-      onSave(expense, editingExpense ? "edit" : "add");
-      if (!editingExpense) {
-        setDraft((current) => ({
-          ...current,
-          amount: "",
-          baseAmount: "",
-          title: "",
-          remark: "",
-          date: current.date,
-          categoryId: current.categoryId,
-          paymentMethod: current.paymentMethod
-        }));
-        setIsBaseAmountManual(false);
-      }
-    }, 180);
+    setIsSaving(false);
+    window.setTimeout(() => onSaved?.(), 220);
   }
 
   function applyMemorySuggestion() {
@@ -261,27 +292,26 @@ export function ExpenseForm({
     setError("");
   }
 
+  const suggestedCategoryId = memorySuggestion?.categoryId ?? suggestion?.categoryId;
+  const suggestedPaymentMethod = memorySuggestion?.paymentMethod;
+  const shouldShowSmartSuggestion =
+    !editingExpense &&
+    Boolean(suggestedCategoryId) &&
+    (suggestedCategoryId !== draft.categoryId || Boolean(suggestedPaymentMethod && suggestedPaymentMethod !== draft.paymentMethod));
+
   return (
-    <div className={compact ? "expense-form compact" : "expense-form"}>
+    <form
+      className={compact ? "expense-form compact" : "expense-form"}
+      onSubmit={(event) => {
+        event.preventDefault();
+        void submit();
+      }}
+    >
       {!hideTitleRow && (
         <div className="form-title-row">
           <div>
             <h3>{editingExpense ? "Edit expense" : "Add expense"}</h3>
             {duplicate && <p className="form-note warning">This looks similar to an existing expense.</p>}
-            {suggestion && suggestion.categoryId !== draft.categoryId && !editingExpense && (
-              <button className="link-button" type="button" onClick={() => update("categoryId", suggestion.categoryId)}>
-                Use suggested category: {categories.find((category) => category.id === suggestion.categoryId)?.name}
-              </button>
-            )}
-            {memorySuggestion && !editingExpense && (memorySuggestion.categoryId !== draft.categoryId || memorySuggestion.paymentMethod !== draft.paymentMethod) && (
-              <button className="smart-suggestion" type="button" onClick={applyMemorySuggestion}>
-                <span>Smart match</span>
-                <strong>
-                  {categories.find((category) => category.id === memorySuggestion.categoryId)?.name}
-                  {memorySuggestion.paymentMethod ? ` · ${memorySuggestion.paymentMethod}` : ""}
-                </strong>
-              </button>
-            )}
           </div>
           {editingExpense && (
             <button className="icon-button" type="button" onClick={onCancelEdit} aria-label="Cancel editing" title="Cancel editing">
@@ -338,7 +368,7 @@ export function ExpenseForm({
           <label>
             <span>Date</span>
             <div className="date-control">
-              <input className="native-date-input" type="date" value={draft.date} onChange={(event) => update("date", event.target.value)} aria-label="Date" />
+              <input ref={dateInputRef} className="native-date-input" type="date" value={draft.date} onChange={(event) => update("date", event.target.value)} aria-label="Date" />
               <div className="date-display" aria-hidden="true">
                 <strong>{formatDateForField(draft.date)}</strong>
                 <CalendarDays size={17} />
@@ -346,9 +376,12 @@ export function ExpenseForm({
             </div>
           </label>
         )}
-        <label>
-          <span>Category</span>
-          <select value={draft.categoryId} onChange={(event) => update("categoryId", event.target.value)}>
+        <label className={categoryNeedsReview ? "field-needs-review" : ""}>
+          <span>
+            Category
+            {categoryNeedsReview && <small>Check</small>}
+          </span>
+          <select ref={categoryInputRef} value={draft.categoryId} onChange={(event) => updateCategory(event.target.value)}>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.name}
@@ -370,17 +403,37 @@ export function ExpenseForm({
           <span>Description</span>
           <input value={draft.title} placeholder="Lunch, NTUC, Grab..." onChange={(event) => update("title", event.target.value)} />
         </label>
+        {shouldShowSmartSuggestion && (
+          <button
+            className="smart-suggestion span-2"
+            type="button"
+            onClick={() => {
+              if (memorySuggestion) {
+                applyMemorySuggestion();
+              } else if (suggestion) {
+                updateCategory(suggestion.categoryId);
+              }
+            }}
+          >
+            <span>{memorySuggestion ? "Matched previous entry" : "Suggested category"}</span>
+            <strong>
+              {categories.find((category) => category.id === suggestedCategoryId)?.name}
+              {suggestedPaymentMethod ? ` · ${suggestedPaymentMethod}` : ""}
+            </strong>
+          </button>
+        )}
         <label className="span-2">
           <span>Remark</span>
           <input value={draft.remark} placeholder="Optional note" onChange={(event) => update("remark", event.target.value)} />
         </label>
       </div>
-      {error && <p className="form-note danger">{error}</p>}
-      <button className={didSave ? "primary-button save-button saved" : "primary-button save-button"} type="button" disabled={didSave} onClick={submit}>
+      {error && <p className="form-note danger" role="alert">{error}</p>}
+      <p className="sr-only" aria-live="polite">{didSave ? "Expense saved." : isSaving ? "Saving expense." : ""}</p>
+      <button className={didSave ? "primary-button save-button saved" : "primary-button save-button"} type="submit" disabled={didSave || isSaving}>
         <Check size={17} />
-        {didSave ? "Saved" : saveLabel ?? (editingExpense ? "Save changes" : "Save expense")}
+        {didSave ? "Saved" : isSaving ? "Saving…" : saveLabel ?? (editingExpense ? "Save changes" : "Save expense")}
       </button>
-    </div>
+    </form>
   );
 }
 

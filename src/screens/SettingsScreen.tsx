@@ -10,7 +10,7 @@ import { resetSpendingData as resetProfileSpendingData } from "../lib/dataContro
 import { compareIsoDates, formatLocalIsoDate, parseLocalDate } from "../lib/date";
 import { createId, MAX_ACCENT_PALETTE_COLORS, normalizeAccentPalette, nowIso } from "../lib/defaults";
 import { formatMoney, parseMoney } from "../lib/money";
-import { advanceRecurringRulePastRecorded, hasRecordedRecurringExpense, resolveRecurringRuleNextDate } from "../lib/recurring";
+import { advanceRecurringRulePastRecorded, hasRecordedRecurringExpense, linkRecordedRecurringExpenses, resolveRecurringRuleNextDate } from "../lib/recurring";
 import { DEFAULT_WALLPAPER_OPACITY, MAX_WALLPAPERS, clampWallpaperOpacity, createWallpaperFromFile, formatBytes, trimWallpapers } from "../lib/wallpaper";
 import type { Category, ProfileData, ProfileMeta, RecurringCadence, RecurringRule } from "../lib/types";
 import type { LocalSpendRepository } from "../lib/storage/repository";
@@ -19,7 +19,7 @@ interface SettingsScreenProps {
   activeProfile: ProfileMeta;
   data: ProfileData;
   repository: LocalSpendRepository;
-  saveData: (data: ProfileData) => Promise<void>;
+  saveData: (data: ProfileData) => Promise<boolean>;
 }
 
 type SettingsSection = "appearance" | "bills" | "categories" | "payments";
@@ -86,6 +86,22 @@ function isDuplicateImportedExpense(expense: ProfileData["expenses"][number], ex
       (item.title?.trim().toLowerCase() ?? "") === title
     );
   });
+}
+
+function backupIsDue(lastBackupAt: string | null | undefined, expenseCount: number): boolean {
+  if (expenseCount === 0) return false;
+  if (!lastBackupAt) return true;
+  const timestamp = Date.parse(lastBackupAt);
+  return !Number.isFinite(timestamp) || Date.now() - timestamp > 30 * 24 * 60 * 60 * 1000;
+}
+
+function backupLabel(lastBackupAt: string | null | undefined, expenseCount: number): string {
+  if (expenseCount === 0 && !lastBackupAt) return "No backup needed yet.";
+  if (!lastBackupAt) return "No backup yet. Save one before moving or resetting this app.";
+  const timestamp = Date.parse(lastBackupAt);
+  if (!Number.isFinite(timestamp)) return "Backup recommended.";
+  const label = new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short", year: "numeric" }).format(new Date(timestamp));
+  return backupIsDue(lastBackupAt, expenseCount) ? `Last backup: ${label} · New backup recommended.` : `Last backup: ${label}`;
 }
 
 export function SettingsScreen({ activeProfile, data, repository, saveData }: SettingsScreenProps) {
@@ -176,7 +192,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
       : null;
 
   async function updateSettings(patch: Partial<ProfileData["appSettings"]>) {
-    await saveData({
+    return saveData({
       ...data,
       appSettings: {
         ...data.appSettings,
@@ -219,6 +235,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
     const fileName = `localspend-${slugify(activeProfile.displayName)}-${dateStamp()}-backup.json`;
     await repository.saveProfileFile(activeProfile.id, "backup", fileName, contents);
     downloadTextFile(fileName, contents, "application/json");
+    await updateSettings({ lastBackupAt: nowIso() });
     setStatus("");
   }
 
@@ -247,7 +264,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
 
   async function confirmJsonRestore() {
     if (!pendingRestore) return;
-    await saveData(pendingRestore.data);
+    if (!(await saveData(pendingRestore.data))) return;
     setPendingRestore(null);
     setStatus("");
   }
@@ -270,16 +287,17 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
 
   async function confirmCsvImport() {
     if (!pendingCsvImport) return;
-    await saveData({
+    const saved = await saveData({
       ...data,
       expenses: [...data.expenses, ...pendingCsvImport.expenses]
     });
+    if (!saved) return;
     setPendingCsvImport(null);
     setStatus("");
   }
 
   async function resetSpendingData() {
-    await saveData(resetProfileSpendingData(data));
+    if (!(await saveData(resetProfileSpendingData(data)))) return;
     setIsResettingData(false);
     setStatus("");
   }
@@ -289,7 +307,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
     if (accentPalette.length >= MAX_ACCENT_PALETTE_COLORS) {
       return;
     }
-    await updateSettings({ accentPalette: [...accentPalette, currentAccent] });
+    if (!(await updateSettings({ accentPalette: [...accentPalette, currentAccent] }))) return;
     setStatus("");
   }
 
@@ -300,10 +318,10 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
       setStatus("Keep at least one saved color.");
       return;
     }
-    await updateSettings({
+    if (!(await updateSettings({
       accentPalette: nextPalette,
       accentColor: currentAccent === removedColor ? nextPalette[0] : data.appSettings.accentColor
-    });
+    }))) return;
     setPendingDelete(null);
     setStatus("");
   }
@@ -318,11 +336,11 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
     }
     try {
       const wallpaper = await createWallpaperFromFile(file);
-      await updateSettings({
+      if (!(await updateSettings({
         wallpapers: trimWallpapers([wallpaper, ...data.appSettings.wallpapers]),
         activeWallpaperId: wallpaper.id,
         wallpaperOpacity: data.appSettings.wallpaperOpacity || DEFAULT_WALLPAPER_OPACITY
-      });
+      }))) return;
       setStatus("");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not import that wallpaper.");
@@ -344,10 +362,10 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
 
   async function removeWallpaper(wallpaperId: string) {
     const wallpapers = data.appSettings.wallpapers.filter((wallpaper) => wallpaper.id !== wallpaperId);
-    await updateSettings({
+    if (!(await updateSettings({
       wallpapers,
       activeWallpaperId: data.appSettings.activeWallpaperId === wallpaperId ? (wallpapers[0]?.id ?? null) : data.appSettings.activeWallpaperId
-    });
+    }))) return;
     setPendingDelete(null);
     setStatus("");
   }
@@ -359,7 +377,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
       setStatus("That payment method is already in your list.");
       return;
     }
-    await updateSettings({ paymentMethods: [...data.appSettings.paymentMethods, method] });
+    if (!(await updateSettings({ paymentMethods: [...data.appSettings.paymentMethods, method] }))) return;
     setNewMethod("");
     setIsAddingPayment(false);
     setStatus("");
@@ -376,7 +394,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
 
   async function removePaymentMethod(method: string) {
     const paymentMethods = data.appSettings.paymentMethods.filter((item) => item !== method);
-    await updateSettings({ paymentMethods });
+    if (!(await updateSettings({ paymentMethods }))) return;
     if (recurringDraft.paymentMethod === method) {
       setRecurringDraft({ ...recurringDraft, paymentMethod: paymentMethods[0] ?? "Other" });
     }
@@ -399,7 +417,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
       sortOrder: data.categories.length,
       isDefault: false
     };
-    await saveData({ ...data, categories: [...data.categories, category] });
+    if (!(await saveData({ ...data, categories: [...data.categories, category] }))) return;
     setNewCategoryName("");
     setNewCategoryIcon("");
     setIsAddingCategory(false);
@@ -428,11 +446,12 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
 
   async function deleteCategory(category: Category) {
     const categories = data.categories.filter((item) => item.id !== category.id);
-    await saveData({
+    const saved = await saveData({
       ...data,
       categories,
       budgets: data.budgets.filter((budget) => budget.categoryId !== category.id)
     });
+    if (!saved) return;
     if (recurringDraft.categoryId === category.id) {
       setRecurringDraft({ ...recurringDraft, categoryId: categories[0]?.id ?? "" });
     }
@@ -446,7 +465,16 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
   }
 
   async function deleteRecurringRule(rule: RecurringRule) {
-    await saveData({ ...data, recurringRules: data.recurringRules.filter((item) => item.id !== rule.id) });
+    const saved = await saveData({
+      ...data,
+      expenses: data.expenses.map((expense) =>
+        expense.recurringRuleId === rule.id
+          ? { ...expense, recurringRuleId: null, recurringOccurrenceDate: null }
+          : expense
+      ),
+      recurringRules: data.recurringRules.filter((item) => item.id !== rule.id)
+    });
+    if (!saved) return;
     setPendingDelete(null);
     setStatus("");
   }
@@ -519,12 +547,17 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
       createdAt: existingRule?.createdAt ?? timestamp,
       updatedAt: timestamp
     };
+    const expensesWithStableLinks = linkRecordedRecurringExpenses(data.expenses, existingRule ?? rule);
     const advanceCutoff = compareIsoDates(rule.nextDate, today) <= 0 ? today : rule.nextDate;
-    const normalizedRule = scheduleChanged ? resolveRecurringRuleNextDate(rule, data.expenses, today) : advanceRecurringRulePastRecorded(rule, data.expenses, advanceCutoff);
-    await saveData({
+    const normalizedRule = scheduleChanged
+      ? resolveRecurringRuleNextDate(rule, expensesWithStableLinks, today)
+      : advanceRecurringRulePastRecorded(rule, expensesWithStableLinks, advanceCutoff);
+    const saved = await saveData({
       ...data,
+      expenses: expensesWithStableLinks,
       recurringRules: existingRule ? data.recurringRules.map((item) => (item.id === existingRule.id ? normalizedRule : item)) : [...data.recurringRules, normalizedRule]
     });
+    if (!saved) return;
     closeBillForm();
     setStatus("");
   }
@@ -553,7 +586,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
           </button>
         ))}
       </section>
-      {status && <p className="form-note warning settings-status">{status}</p>}
+      {status && <p className="form-note warning settings-status" role="status" aria-live="polite">{status}</p>}
 
       {activeSection === "appearance" && (
         <div className="appearance-blocks">
@@ -801,6 +834,9 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
                 <input type="file" accept=".csv,text/csv" onChange={(event) => void prepareCsvImport(event)} />
               </label>
             </div>
+            <p className={backupIsDue(data.appSettings.lastBackupAt, data.expenses.length) ? "form-note warning backup-freshness" : "muted small backup-freshness"}>
+              {backupLabel(data.appSettings.lastBackupAt, data.expenses.length)}
+            </p>
             {pendingRestore && (
               <div className="data-confirm-box">
                 <span>Restore {pendingRestore.fileName}?</span>

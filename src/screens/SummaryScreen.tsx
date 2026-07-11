@@ -1,5 +1,5 @@
 import { lazy, Suspense, useMemo, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowDownRight, ArrowLeft, ArrowRight, ArrowUpRight } from "lucide-react";
 import { budgetProgress, calculateSafeToSpend, summarizeMonth } from "../lib/analytics";
 import { categoryName } from "../lib/categories";
 import { expenseBaseAmount, isForeignExpense } from "../lib/currencies";
@@ -19,7 +19,7 @@ function formatDetailDate(value: string): string {
 
 interface SummaryScreenProps {
   data: ProfileData;
-  saveData: (data: ProfileData) => Promise<void>;
+  saveData: (data: ProfileData) => Promise<boolean>;
 }
 
 export function SummaryScreen({ data, saveData }: SummaryScreenProps) {
@@ -72,10 +72,11 @@ export function SummaryScreen({ data, saveData }: SummaryScreenProps) {
       categoryId: null,
       amount
     };
-    await saveData({
+    const saved = await saveData({
       ...data,
       budgets: existing ? data.budgets.map((budget) => (budget.id === existing.id ? nextBudget : budget)) : [...data.budgets, nextBudget]
     });
+    if (!saved) return;
     setBudgetInput("");
     setIsBudgetEditorOpen(false);
   }
@@ -138,6 +139,12 @@ export function SummaryScreen({ data, saveData }: SummaryScreenProps) {
         <div>
           <p className="eyebrow">Summary</p>
           <h2>{formatMoney(summary.total, data.appSettings.currency)}</h2>
+          {summary.monthOverMonthDelta !== null && (
+            <span className={summary.monthOverMonthDelta > 0 ? "month-comparison up" : summary.monthOverMonthDelta < 0 ? "month-comparison down" : "month-comparison flat"}>
+              {summary.monthOverMonthDelta > 0 ? <ArrowUpRight size={15} /> : summary.monthOverMonthDelta < 0 ? <ArrowDownRight size={15} /> : <ArrowRight size={15} />}
+              {summary.monthOverMonthDelta === 0 ? "Same as last month" : `${formatMoney(Math.abs(summary.monthOverMonthDelta), data.appSettings.currency)} ${summary.monthOverMonthDelta < 0 ? "less" : "more"} than last month`}
+            </span>
+          )}
         </div>
         <MonthPicker month={month} onChange={setMonth} />
       </section>

@@ -1,6 +1,7 @@
 import { type CSSProperties, useMemo, useState } from "react";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Plus, Search } from "lucide-react";
 import { buildCalendarMonth, formatMonthKey, parseLocalDate } from "../lib/date";
+import { clearExpenseDraft, expenseDraftKey } from "../lib/drafts";
 import { getDailyTotals } from "../lib/analytics";
 import { fallbackCategoryId } from "../lib/categories";
 import { formatCalendarCellAmount, formatMoney } from "../lib/money";
@@ -13,15 +14,17 @@ import { ExpenseList } from "../components/ExpenseList";
 import { FormBackAction } from "../components/FormBackAction";
 import { MonthPicker } from "../components/MonthPicker";
 import { NaturalQuickAdd } from "../components/NaturalQuickAdd";
+import { TransactionSearch } from "../components/TransactionSearch";
 
 interface CalendarScreenProps {
+  profileId: string;
   data: ProfileData;
-  upsertExpense: (expense: Expense) => Promise<void>;
-  deleteExpense: (expenseId: string) => Promise<void>;
+  upsertExpense: (expense: Expense) => Promise<boolean>;
+  deleteExpense: (expenseId: string) => Promise<boolean>;
   secrets: AiSecretStore;
 }
 
-export function CalendarScreen({ data, upsertExpense, deleteExpense, secrets }: CalendarScreenProps) {
+export function CalendarScreen({ profileId, data, upsertExpense, deleteExpense, secrets }: CalendarScreenProps) {
   const [month, setMonth] = useState(formatMonthKey());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -29,7 +32,9 @@ export function CalendarScreen({ data, upsertExpense, deleteExpense, secrets }: 
   const [quickText, setQuickText] = useState("");
   const [quickDraft, setQuickDraft] = useState<Partial<ExpenseDraft> | undefined>();
   const [quickMessage, setQuickMessage] = useState("");
+  const [quickCategoryNeedsReview, setQuickCategoryNeedsReview] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const monthExpenses = useMemo(() => data.expenses.filter((expense) => expense.date.startsWith(month)), [data.expenses, month]);
   const dailyTotals = useMemo(() => getDailyTotals(monthExpenses), [monthExpenses]);
   const maxDaily = Math.max(1, ...Object.values(dailyTotals));
@@ -41,8 +46,12 @@ export function CalendarScreen({ data, upsertExpense, deleteExpense, secrets }: 
     ? new Intl.DateTimeFormat("en-SG", { weekday: "short", day: "numeric", month: "short", year: "numeric" }).format(parseLocalDate(selectedDate))
     : "";
   const cells = buildCalendarMonth(month);
+  const activeDraftKey = selectedDate
+    ? expenseDraftKey(profileId, editingExpense ? `edit.${editingExpense.id}` : `calendar.${selectedDate}`)
+    : undefined;
 
   function closeSelectedDay() {
+    clearExpenseDraft(activeDraftKey);
     setSelectedDate(null);
     setEditingExpense(null);
     setIsAdding(false);
@@ -53,6 +62,7 @@ export function CalendarScreen({ data, upsertExpense, deleteExpense, secrets }: 
     setQuickText("");
     setQuickDraft(undefined);
     setQuickMessage("");
+    setQuickCategoryNeedsReview(false);
     setIsParsing(false);
   }
 
@@ -80,10 +90,29 @@ export function CalendarScreen({ data, upsertExpense, deleteExpense, secrets }: 
         remark: parsed.source === "ai" ? "AI suggestion" : "",
         paymentMethod: parsed.paymentMethod ?? mostUsedPaymentMethod(data.expenses, data.appSettings.paymentMethods)
       });
+      setQuickCategoryNeedsReview(!parsed.categoryId || (parsed.categoryConfidence ?? 0) < 0.72);
       setQuickMessage(parsed.source === "ai" ? "AI suggestion ready. Check it before saving." : "Draft ready. Check it before saving.");
     } finally {
       setIsParsing(false);
     }
+  }
+
+  if (isSearching) {
+    return (
+      <TransactionSearch
+        data={data}
+        onBack={() => setIsSearching(false)}
+        onEdit={(expense) => {
+          setMonth(expense.date.slice(0, 7));
+          setSelectedDate(expense.date);
+          setEditingExpense(expense);
+          setIsAdding(false);
+          setIsSearching(false);
+          clearDraft();
+        }}
+        onDelete={(expenseId) => void deleteExpense(expenseId)}
+      />
+    );
   }
 
   if (selectedDate) {
@@ -132,6 +161,7 @@ export function CalendarScreen({ data, upsertExpense, deleteExpense, secrets }: 
             <>
               <FormBackAction
                 onClick={() => {
+                  clearExpenseDraft(activeDraftKey);
                   setEditingExpense(null);
                   setIsAdding(false);
                   clearDraft();
@@ -148,6 +178,8 @@ export function CalendarScreen({ data, upsertExpense, deleteExpense, secrets }: 
                 hideDate={!editingExpense}
                 hideTitleRow
                 autoFocusAmount={!editingExpense}
+                draftStorageKey={activeDraftKey}
+                initialCategoryNeedsReview={quickCategoryNeedsReview}
                 afterAmount={
                   !editingExpense ? (
                     <NaturalQuickAdd
@@ -166,8 +198,8 @@ export function CalendarScreen({ data, upsertExpense, deleteExpense, secrets }: 
                   setIsAdding(false);
                   clearDraft();
                 }}
-                onSave={(expense) => {
-                  void upsertExpense(expense);
+                onSave={(expense) => upsertExpense(expense)}
+                onSaved={() => {
                   setEditingExpense(null);
                   setIsAdding(false);
                   clearDraft();
@@ -210,7 +242,12 @@ export function CalendarScreen({ data, upsertExpense, deleteExpense, secrets }: 
         <section className="panel calendar-panel">
           <div className="section-heading compact-heading">
             <h2>Daily pattern</h2>
-            <span className="muted small">Darker days spent more</span>
+            <div className="calendar-heading-actions">
+              <span className="muted small">Darker days spent more</span>
+              <button className="icon-button" type="button" onClick={() => setIsSearching(true)} aria-label="Search spending" title="Search spending">
+                <Search size={17} />
+              </button>
+            </div>
           </div>
           <div className="weekday-grid">
             {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (

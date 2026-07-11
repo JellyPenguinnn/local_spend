@@ -11,9 +11,9 @@ import { ExpenseList } from "../components/ExpenseList";
 
 interface CategoriesScreenProps {
   data: ProfileData;
-  saveData: (data: ProfileData) => Promise<void>;
-  upsertExpense: (expense: Expense) => Promise<void>;
-  deleteExpense: (expenseId: string) => Promise<void>;
+  saveData: (data: ProfileData) => Promise<boolean>;
+  upsertExpense: (expense: Expense) => Promise<boolean>;
+  deleteExpense: (expenseId: string) => Promise<boolean>;
 }
 
 export function CategoriesScreen({ data, saveData, upsertExpense, deleteExpense }: CategoriesScreenProps) {
@@ -135,8 +135,8 @@ export function CategoriesScreen({ data, saveData, upsertExpense, deleteExpense 
               defaultDate={editingExpense.date}
               editingExpense={editingExpense}
               onCancelEdit={() => setEditingExpense(null)}
-              onSave={(expense) => {
-                void upsertExpense(expense);
+              onSave={(expense) => upsertExpense(expense)}
+              onSaved={() => {
                 setEditingExpense(null);
               }}
             />
