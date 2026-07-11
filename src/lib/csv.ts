@@ -7,7 +7,20 @@ export interface CsvImportResult {
   errors: string[];
 }
 
-const CSV_HEADERS = ["date", "amount", "currency", "category", "title", "remark", "paymentMethod"];
+const CSV_HEADERS = [
+  "date",
+  "amount",
+  "currency",
+  "baseAmount",
+  "baseCurrency",
+  "exchangeRate",
+  "exchangeRateDate",
+  "exchangeRateSource",
+  "category",
+  "title",
+  "remark",
+  "paymentMethod"
+];
 
 export function exportExpensesCsv(expenses: Expense[], categories: Category[]): string {
   const categoryMap = new Map(categories.map((category) => [category.id, category.name]));
@@ -18,6 +31,11 @@ export function exportExpensesCsv(expenses: Expense[], categories: Category[]): 
       expense.date,
       expense.amount.toFixed(2),
       expense.currency,
+      expense.baseAmount.toFixed(2),
+      expense.baseCurrency,
+      expense.exchangeRate.toFixed(8).replace(/0+$/, "").replace(/\.$/, ""),
+      expense.exchangeRateDate,
+      expense.exchangeRateSource,
       categoryMap.get(expense.categoryId) ?? expense.categoryId,
       expense.title ?? "",
       expense.remark ?? "",
@@ -37,6 +55,11 @@ export function importExpensesCsv(csv: string, categories: Category[], fallbackC
   const amountIndex = headers.indexOf("amount");
   const categoryIndex = headers.indexOf("category");
   const currencyIndex = headers.indexOf("currency");
+  const baseAmountIndex = headers.indexOf("baseamount");
+  const baseCurrencyIndex = headers.indexOf("basecurrency");
+  const exchangeRateIndex = headers.indexOf("exchangerate");
+  const exchangeRateDateIndex = headers.indexOf("exchangeratedate");
+  const exchangeRateSourceIndex = headers.indexOf("exchangeratesource");
   const titleIndex = headers.indexOf("title");
   const remarkIndex = headers.indexOf("remark");
   const paymentIndex = headers.indexOf("paymentmethod");
@@ -55,6 +78,9 @@ export function importExpensesCsv(csv: string, categories: Category[], fallbackC
     const line = index + 1;
     const date = row[dateIndex]?.trim();
     const amount = parseMoney(row[amountIndex] ?? "");
+    const currency = (row[currencyIndex]?.trim() || fallbackCurrency).toUpperCase();
+    const importedBaseAmount = baseAmountIndex >= 0 ? parseMoney(row[baseAmountIndex] ?? "") : null;
+    const baseCurrency = (row[baseCurrencyIndex]?.trim() || fallbackCurrency).toUpperCase();
     const categoryText = row[categoryIndex]?.trim() ?? "";
     const categoryId = categoryByName.get(categoryText.toLowerCase()) ?? categories.find((category) => category.id === categoryText)?.id;
 
@@ -70,13 +96,31 @@ export function importExpensesCsv(csv: string, categories: Category[], fallbackC
       errors.push(`Line ${line}: category "${categoryText}" was not found.`);
       continue;
     }
+    if (baseCurrency !== fallbackCurrency.toUpperCase()) {
+      errors.push(`Line ${line}: baseCurrency must match this profile's ${fallbackCurrency.toUpperCase()} base currency.`);
+      continue;
+    }
+    if (currency !== baseCurrency && importedBaseAmount === null) {
+      errors.push(`Line ${line}: baseAmount is required when currency differs from ${baseCurrency}.`);
+      continue;
+    }
+
+    const baseAmount = importedBaseAmount ?? amount;
+    const importedRate = exchangeRateIndex >= 0 ? Number(row[exchangeRateIndex]) : Number.NaN;
+    const exchangeRate = Number.isFinite(importedRate) && importedRate > 0 ? importedRate : baseAmount / amount;
+    const exchangeRateSourceText = row[exchangeRateSourceIndex]?.trim();
 
     const timestamp = nowIso();
     expenses.push({
       id: createId("exp"),
       date,
       amount: roundMoney(amount),
-      currency: row[currencyIndex]?.trim() || fallbackCurrency,
+      currency,
+      baseAmount: roundMoney(baseAmount),
+      baseCurrency,
+      exchangeRate,
+      exchangeRateDate: row[exchangeRateDateIndex]?.trim() || date,
+      exchangeRateSource: isExchangeRateSource(exchangeRateSourceText) ? exchangeRateSourceText : currency === baseCurrency ? "base" : "manual",
       categoryId,
       title: cleanOptional(row[titleIndex]),
       remark: cleanOptional(row[remarkIndex]),
@@ -86,6 +130,10 @@ export function importExpensesCsv(csv: string, categories: Category[], fallbackC
     });
   }
   return { expenses, errors };
+}
+
+function isExchangeRateSource(value: string | undefined): value is Expense["exchangeRateSource"] {
+  return ["base", "ecb-reference", "reference", "cached", "manual", "legacy"].includes(value ?? "");
 }
 
 function csvEscape(value: string): string {

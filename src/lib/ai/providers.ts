@@ -31,7 +31,8 @@ export async function parseExpenseWithAiOrLocal(
     const category = parsed.categoryName
       ? categories.find((item) => item.name.toLowerCase() === parsed.categoryName?.toLowerCase())
       : undefined;
-    return enrichWithExpenseHistory(input, mapAiExpenseToDraft(parsed, category?.id ?? enrichedLocal?.categoryId), expenses);
+    const aiDraft = mapAiExpenseToDraft(parsed, category?.id ?? enrichedLocal?.categoryId);
+    return enrichWithExpenseHistory(input, { ...aiDraft, currency: aiDraft.currency ?? enrichedLocal?.currency }, expenses);
   } catch {
     return enrichedLocal;
   }
@@ -93,7 +94,7 @@ export function aggregateFromDataForAi(
   month: string,
   currency: string
 ): MonthlyAggregateForAi {
-  return aggregateForAi(summarizeMonth(expenses, categories, month), currency);
+  return aggregateForAi(summarizeMonth(expenses, categories, month, currency), currency);
 }
 
 export async function testAiConnection(settings: AiSettings, secrets: AiSecretStore): Promise<string> {

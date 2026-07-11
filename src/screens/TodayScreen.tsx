@@ -64,6 +64,8 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
       }
       setQuickDraft({
         amount: parsed.amount,
+        currency: parsed.currency ?? data.appSettings.currency,
+        baseAmount: "",
         date: today,
         categoryId: parsed.categoryId ?? fallbackCategoryId(data.categories),
         title: parsed.title ?? quickText,

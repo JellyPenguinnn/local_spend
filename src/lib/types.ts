@@ -6,6 +6,8 @@ export type AiProvider = "none" | "ollama-local" | "gemini" | "groq" | "openrout
 
 export type RecurringCadence = "daily" | "weekly" | "monthly" | "annually";
 
+export type ExchangeRateSource = "base" | "ecb-reference" | "reference" | "cached" | "manual" | "legacy";
+
 export interface ProfileMeta {
   id: string;
   displayName: string;
@@ -30,8 +32,15 @@ export interface Category {
 
 export interface Expense {
   id: string;
+  /** Amount and currency as paid by the user. */
   amount: number;
   currency: string;
+  /** Stable reporting value captured when the expense is saved. */
+  baseAmount: number;
+  baseCurrency: string;
+  exchangeRate: number;
+  exchangeRateDate: string;
+  exchangeRateSource: ExchangeRateSource;
   date: string;
   categoryId: string;
   title?: string | null;
@@ -67,7 +76,9 @@ export interface RecurringRule {
 }
 
 export interface AppSettings {
+  /** Currency used by summaries, calendars, and budgets. */
   currency: string;
+  enabledCurrencies: string[];
   theme: ThemeKey;
   accentColor: string;
   accentPalette: string[];
@@ -106,6 +117,8 @@ export interface ProfileData {
 
 export interface ExpenseDraft {
   amount: number | string;
+  currency: string;
+  baseAmount: number | string;
   date: string;
   categoryId: string;
   title: string;
@@ -122,6 +135,7 @@ export interface CategorySuggestion {
 
 export interface ParsedExpenseDraft {
   amount?: number;
+  currency?: string;
   date?: string;
   categoryId?: string;
   categoryConfidence?: number;

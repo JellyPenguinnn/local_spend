@@ -71,6 +71,8 @@ export function CalendarScreen({ data, upsertExpense, deleteExpense, secrets }: 
       }
       setQuickDraft({
         amount: parsed.amount,
+        currency: parsed.currency ?? data.appSettings.currency,
+        baseAmount: "",
         date: selectedDate,
         categoryId: parsed.categoryId ?? fallbackCategoryId(data.categories),
         title: parsed.title ?? quickText,

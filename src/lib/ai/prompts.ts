@@ -7,6 +7,7 @@ export function expenseParsePrompt(input: string, today: string, categories: Cat
     `Allowed categories: ${categories.map((category) => category.name).join(", ")}.`,
     "If the text says yesterday, use the date before today.",
     "Keep title as a short description: merchant/item keywords only. Remove amount, date, category, and payment words from title.",
+    "Return currency as a three-letter ISO code only when the text clearly states it, such as RM/MYR or SGD.",
     "Extract paymentMethod only when the text clearly names one. Do not invent extra details.",
     `Expense text: ${input}`
   ].join("\n");

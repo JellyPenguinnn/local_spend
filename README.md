@@ -13,6 +13,7 @@ LocalSpend is a local-first spending tracker for fast daily expense entry, month
 
 - **Today**: see today's total, add spending quickly, edit or delete entries, and record due bills.
 - **Natural quick add**: type spending naturally, such as `yakun 5.70 paynow`, then confirm the draft before saving.
+- **Mixed currencies**: keep the original amount, such as `MYR 18.00`, while budgets and summaries use a stable SGD equivalent.
 - **Calendar**: review monthly daily totals, select a day, and add or edit entries for that date.
 - **Summary**: view monthly total, budget progress, category donut chart, and category-level spending details.
 - **Bills**: create recurring bills or subscriptions with daily, weekly, monthly, or annual cadence.
@@ -26,6 +27,7 @@ LocalSpend is intentionally not a SaaS product.
 
 - No ads, telemetry, analytics, cloud login, subscription, or payment features.
 - Spending data stays local to the device/profile where it is entered.
+- Foreign-currency reference requests send only currency codes and a date, never an amount, description, category, or spending history.
 - The PWA stores data in that browser/PWA install. Each friend's phone has separate local data.
 - The macOS Tauri app stores each local profile in its own SQLite database.
 - Imported wallpapers are stored locally with the active profile.
@@ -156,6 +158,8 @@ profiles/
 
 `profiles.json` stores profile metadata only. Spending records live in the active profile database. In browser/PWA mode, the app uses browser storage instead of SQLite so it can run from GitHub Pages.
 
+Each expense stores its original amount/currency and a dated base-currency value. The original value remains visible in transaction details, while Calendar, Summary, category distribution, and budgets use the stable base value. Historical expenses are not revalued later.
+
 ## Data Controls
 
 LocalSpend includes profile-scoped data controls in Settings:
@@ -208,6 +212,7 @@ cargo test
 - The hosted PWA uses browser storage, while the macOS Tauri app uses SQLite.
 - Native iOS App Store/TestFlight distribution is not part of v1.
 - Cloud AI provider setup is disabled in the simplified v1 UI; natural quick add uses local parsing.
+- Automatic foreign-currency conversion uses an informational reference rate and may differ from a bank, card, or cash exchange rate; the converted amount can be edited before saving.
 - No license file has been added yet.
 
 ## Documentation

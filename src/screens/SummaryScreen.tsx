@@ -2,6 +2,7 @@ import { lazy, Suspense, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { budgetProgress, calculateSafeToSpend, summarizeMonth } from "../lib/analytics";
 import { categoryName } from "../lib/categories";
+import { expenseBaseAmount, isForeignExpense } from "../lib/currencies";
 import { createId } from "../lib/defaults";
 import { formatMonthKey, parseLocalDate } from "../lib/date";
 import { formatMoney, parseMoney } from "../lib/money";
@@ -27,7 +28,10 @@ export function SummaryScreen({ data, saveData }: SummaryScreenProps) {
   const [isBudgetEditorOpen, setIsBudgetEditorOpen] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [drilldownCategoryId, setDrilldownCategoryId] = useState<string | null>(null);
-  const summary = useMemo(() => summarizeMonth(data.expenses, data.categories, month), [data.categories, data.expenses, month]);
+  const summary = useMemo(
+    () => summarizeMonth(data.expenses, data.categories, month, data.appSettings.currency),
+    [data.appSettings.currency, data.categories, data.expenses, month]
+  );
   const totalBudget = budgetProgress(data.budgets, data.expenses, month, null);
   const safeToSpend = useMemo(() => calculateSafeToSpend(data.budgets, data.expenses, month), [data.budgets, data.expenses, month]);
   const drilldownCategory = summary.categoryTotals.find((category) => category.categoryId === drilldownCategoryId) ?? null;
@@ -78,7 +82,7 @@ export function SummaryScreen({ data, saveData }: SummaryScreenProps) {
 
   if (drilldownCategoryId) {
     const title = drilldownCategory?.name ?? categoryName(data.categories, drilldownCategoryId);
-    const total = drilldownCategory?.total ?? drilldownExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+    const total = drilldownCategory?.total ?? drilldownExpenses.reduce((sum, expense) => sum + expenseBaseAmount(expense), 0);
     return (
       <div className="summary-screen">
         <section className="hero-panel app-metric-hero summary-hero category-detail-hero">
@@ -113,7 +117,10 @@ export function SummaryScreen({ data, saveData }: SummaryScreenProps) {
                         <strong>{expense.title || title}</strong>
                         {expense.remark && <span>Remark: {expense.remark}</span>}
                       </div>
-                      <strong>{formatMoney(expense.amount, expense.currency || data.appSettings.currency)}</strong>
+                      <span className="category-detail-amount">
+                        <strong>{formatMoney(expense.amount, expense.currency || data.appSettings.currency)}</strong>
+                        {isForeignExpense(expense, data.appSettings.currency) && <small>≈ {formatMoney(expenseBaseAmount(expense), data.appSettings.currency)}</small>}
+                      </span>
                     </article>
                   ))}
                 </section>

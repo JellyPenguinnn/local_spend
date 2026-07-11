@@ -98,3 +98,13 @@ Researched on 2026-07-10.
 - Microsoft Mica is a useful reference for wallpaper-aware personalization: it treats wallpaper as the base layer, then puts low-opacity content/card layers above it for hierarchy and readability instead of applying backdrop effects to every element: https://learn.microsoft.com/en-us/windows/apps/design/style/mica
 - Material Design 3 color roles reinforce separating neutral surfaces from primary/accent roles. LocalSpend should keep neutral readable surfaces, with selected/action elements using the accent more strongly: https://m3.material.io/styles/color/roles
 - Implementation direction: use a frosted `material` layer for panels and rows, a stronger `material-raised` layer for active tabs/date pills, subtle accent borders/shadows for identity, and saturated accent only for primary actions/progress.
+
+## Mixed-Currency Spending
+
+Researched on 2026-07-10.
+
+- BudgetBakers Wallet keeps currencies attached to their original accounts and supports automatic or manually adjusted exchange rates. This confirms that the paid amount should be preserved instead of overwritten by a conversion: https://support.budgetbakers.com/hc/en-us/articles/7149418777746-Multiple-Currencies-Exchange-Rates
+- YNAB recommends separate plans for separate currencies, which avoids exchange-rate ambiguity but fragments a single monthly view. That is too heavy for LocalSpend's common SGD-with-occasional-MYR use case: https://support.ynab.com/en_us/using-multiple-currencies-in-ynab-a-guide-SyBF6PHno
+- The ECB publishes working-day reference rates for both MYR and SGD and notes that reference rates are informational, not necessarily the rate used for an actual card or cash transaction: https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html
+- Frankfurter provides a browser-safe, no-key API over central-bank data, supports historical dates, and allows an ECB-only provider filter: https://frankfurter.dev/ and https://frankfurter.dev/providers/ecb/
+- LocalSpend therefore stores one transaction with two values: original amount/currency and a dated base-currency snapshot. Summaries and budgets use the snapshot; details and exports preserve the amount paid. A user can override the reference conversion to match a bank statement or cash exchange rate.

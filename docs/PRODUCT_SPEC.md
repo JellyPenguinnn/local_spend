@@ -17,16 +17,19 @@
 
 ## Data Model
 
-- `expenses`: id, amount, currency, date, category id, title, remark, payment method, timestamps.
+- `expenses`: id, original amount/currency, base amount/currency, exchange rate/date/source, date, category id, title, remark, payment method, timestamps.
 - `categories`: id, name, color, optional icon, sort order, default flag.
 - `budgets`: id, month, nullable category id, amount.
 - `recurring_rules`: title, amount, cadence, start date, next due date, category, payment method, active flag.
-- `app_settings`: currency, light/dark mode, accent color, payment methods, imported wallpapers, active wallpaper, wallpaper visibility.
+- `app_settings`: base currency, enabled spending currencies, light/dark mode, accent color, payment methods, imported wallpapers, active wallpaper, wallpaper visibility.
 - `ai_settings`: provider, base URL, model, timeout, max tokens, key-saved flag.
 
 ## Core Workflows
 
 - Add, edit, delete expenses from Today and selected Calendar days.
+- Entry defaults to the profile base currency. Choosing another enabled currency reveals a compact base equivalent populated from a dated reference rate and editable to the actual card/cash conversion.
+- Expense details show the original amount first and an approximate base equivalent second. Calendar, Summary, category totals, and budgets always use the saved base amount.
+- Existing expenses keep stable historical totals; saved conversions are not recalculated when market rates change.
 - Calendar supports month/year boundaries and local `YYYY-MM-DD` dates.
 - Month selection uses app-owned month/year controls from 2025 onward, so it works on iPhone even where native month inputs are limited.
 - Summary calculates category distribution, month-over-month comparison, budget progress, and deterministic comments.
@@ -54,6 +57,7 @@
 ## Import, Export, Backup, Restore
 
 - CSV export/import applies only to active profile expenses.
+- CSV stores original and base amounts plus exchange-rate metadata so mixed-currency history can be restored accurately.
 - JSON backup/restore applies only to the active profile's data payload.
 - Desktop exports/backups are also saved under the active profile's `exports/` or `backups/` folder.
 - Reset clears only the active profile after confirmation.

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { categoryName } from "../lib/categories";
+import { expenseBaseAmount, isForeignExpense } from "../lib/currencies";
 import { formatMoney } from "../lib/money";
 import type { Category, Expense } from "../lib/types";
 import { CategoryChip } from "./CategoryChip";
@@ -41,7 +42,10 @@ export function ExpenseList({ expenses, categories, currency, compact = false, o
                 {expense.remark && <span>Remark: {expense.remark}</span>}
               </div>
             </div>
-            <strong className="expense-amount">{formatMoney(expense.amount, expense.currency || currency)}</strong>
+            <div className="expense-amount-stack">
+              <strong className="expense-amount">{formatMoney(expense.amount, expense.currency || currency)}</strong>
+              {isForeignExpense(expense, currency) && <span>≈ {formatMoney(expenseBaseAmount(expense), currency)}</span>}
+            </div>
             <div className={pendingDeleteId === expense.id ? "row-actions confirming" : "row-actions"}>
               {pendingDeleteId === expense.id ? (
                 <>

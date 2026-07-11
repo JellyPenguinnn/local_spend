@@ -1,4 +1,5 @@
 import { createDefaultProfileData, createId, normalizeAccentPalette, normalizeRecurringRules, nowIso } from "../defaults";
+import { normalizeCurrencyCode, normalizeEnabledCurrencies, normalizeExpenses } from "../currencies";
 import type { ProfileData, ProfileMeta, ProfilesState, ThemeKey } from "../types";
 import { clampWallpaperOpacity, trimWallpapers } from "../wallpaper";
 
@@ -247,11 +248,12 @@ class BrowserRepository implements LocalSpendRepository {
 
 function normalizeProfileData(data: Partial<ProfileData>): ProfileData {
   const fallback = createDefaultProfileData();
+  const currency = normalizeCurrencyCode(data.appSettings?.currency, fallback.appSettings.currency);
   const theme = normalizeTheme(data.appSettings?.theme);
   const wallpapers = trimWallpapers(Array.isArray(data.appSettings?.wallpapers) ? data.appSettings.wallpapers : []);
   const activeWallpaperId =
     data.appSettings?.activeWallpaperId && wallpapers.some((wallpaper) => wallpaper.id === data.appSettings?.activeWallpaperId) ? data.appSettings.activeWallpaperId : null;
-  const expenses = Array.isArray(data.expenses) ? data.expenses : [];
+  const expenses = normalizeExpenses(data.expenses, currency);
   return {
     categories: Array.isArray(data.categories) && data.categories.length > 0 ? data.categories : fallback.categories,
     expenses,
@@ -260,6 +262,8 @@ function normalizeProfileData(data: Partial<ProfileData>): ProfileData {
     appSettings: {
       ...fallback.appSettings,
       ...(data.appSettings ?? {}),
+      currency,
+      enabledCurrencies: normalizeEnabledCurrencies(data.appSettings?.enabledCurrencies, currency),
       theme,
       accentColor: data.appSettings?.accentColor ?? fallback.appSettings.accentColor,
       accentPalette: normalizeAccentPalette(data.appSettings?.accentPalette),

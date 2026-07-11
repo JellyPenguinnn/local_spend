@@ -1,6 +1,7 @@
 import { addDays, daysInMonth, formatLocalIsoDate, getMonthParts, parseLocalDate, previousMonthKey } from "./date";
 import { roundMoney } from "./money";
 import { categoryIcon, categoryName } from "./categories";
+import { expenseBaseAmount } from "./currencies";
 import type { Budget, Category, Expense, MonthlyAggregateForAi, RecurringRule } from "./types";
 
 export interface CategoryTotal {
@@ -75,17 +76,17 @@ export function expensesForMonth(expenses: Expense[], month: string): Expense[] 
 
 export function getDailyTotals(expenses: Expense[]): Record<string, number> {
   return expenses.reduce<Record<string, number>>((totals, expense) => {
-    totals[expense.date] = roundMoney((totals[expense.date] ?? 0) + expense.amount);
+    totals[expense.date] = roundMoney((totals[expense.date] ?? 0) + expenseBaseAmount(expense));
     return totals;
   }, {});
 }
 
 export function getCategoryTotals(expenses: Expense[], categories: Category[]): CategoryTotal[] {
-  const total = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const total = expenses.reduce((sum, expense) => sum + expenseBaseAmount(expense), 0);
   const map = new Map<string, { total: number; count: number }>();
   for (const expense of expenses) {
     const current = map.get(expense.categoryId) ?? { total: 0, count: 0 };
-    current.total += expense.amount;
+    current.total += expenseBaseAmount(expense);
     current.count += 1;
     map.set(expense.categoryId, current);
   }
@@ -105,13 +106,13 @@ export function getCategoryTotals(expenses: Expense[], categories: Category[]): 
     .sort((a, b) => b.total - a.total);
 }
 
-export function summarizeMonth(expenses: Expense[], categories: Category[], month: string): MonthlySummary {
+export function summarizeMonth(expenses: Expense[], categories: Category[], month: string, currency = "SGD"): MonthlySummary {
   const current = expensesForMonth(expenses, month);
   const previous = expensesForMonth(expenses, previousMonthKey(month));
   const dailyTotals = getDailyTotals(current);
   const categoryTotals = getCategoryTotals(current, categories);
-  const total = roundMoney(current.reduce((sum, expense) => sum + expense.amount, 0));
-  const previousMonthTotal = previous.length > 0 ? roundMoney(previous.reduce((sum, expense) => sum + expense.amount, 0)) : null;
+  const total = roundMoney(current.reduce((sum, expense) => sum + expenseBaseAmount(expense), 0));
+  const previousMonthTotal = previous.length > 0 ? roundMoney(previous.reduce((sum, expense) => sum + expenseBaseAmount(expense), 0)) : null;
   const highestDay = Object.entries(dailyTotals)
     .map(([date, dayTotal]) => ({ date, total: dayTotal }))
     .sort((a, b) => b.total - a.total)[0] ?? null;
@@ -130,11 +131,11 @@ export function summarizeMonth(expenses: Expense[], categories: Category[], mont
     monthOverMonthDelta,
     deterministicComments: []
   };
-  summary.deterministicComments = buildDeterministicComments(summary);
+  summary.deterministicComments = buildDeterministicComments(summary, currency);
   return summary;
 }
 
-export function buildDeterministicComments(summary: MonthlySummary): string[] {
+export function buildDeterministicComments(summary: MonthlySummary, currency = "SGD"): string[] {
   if (summary.total <= 0) {
     return ["No spending recorded for this month yet."];
   }
@@ -150,9 +151,9 @@ export function buildDeterministicComments(summary: MonthlySummary): string[] {
   }
   if (summary.monthOverMonthDelta !== null) {
     if (summary.monthOverMonthDelta < 0) {
-      comments.push(`You spent less than last month by SGD ${Math.abs(summary.monthOverMonthDelta).toFixed(2)}.`);
+      comments.push(`You spent less than last month by ${currency} ${Math.abs(summary.monthOverMonthDelta).toFixed(2)}.`);
     } else if (summary.monthOverMonthDelta > 0) {
-      comments.push(`You spent more than last month by SGD ${summary.monthOverMonthDelta.toFixed(2)}.`);
+      comments.push(`You spent more than last month by ${currency} ${summary.monthOverMonthDelta.toFixed(2)}.`);
     } else {
       comments.push("Your spending matched last month exactly.");
     }
@@ -163,7 +164,7 @@ export function buildDeterministicComments(summary: MonthlySummary): string[] {
 export function budgetProgress(budgets: Budget[], expenses: Expense[], month: string, categoryId?: string | null): { budget: Budget | null; spent: number; percent: number } {
   const budget = budgets.find((item) => item.month === month && (item.categoryId ?? null) === (categoryId ?? null)) ?? null;
   const relevant = expensesForMonth(expenses, month).filter((expense) => !categoryId || expense.categoryId === categoryId);
-  const spent = roundMoney(relevant.reduce((sum, expense) => sum + expense.amount, 0));
+  const spent = roundMoney(relevant.reduce((sum, expense) => sum + expenseBaseAmount(expense), 0));
   const percent = budget && budget.amount > 0 ? Math.min(999, Math.round((spent / budget.amount) * 100)) : 0;
   return { budget, spent, percent };
 }
@@ -376,8 +377,9 @@ export function searchExpenses(
       if (filters.categoryId && expense.categoryId !== filters.categoryId) return false;
       if (filters.startDate && expense.date < filters.startDate) return false;
       if (filters.endDate && expense.date > filters.endDate) return false;
-      if (filters.minAmount != null && expense.amount < filters.minAmount) return false;
-      if (filters.maxAmount != null && expense.amount > filters.maxAmount) return false;
+      const reportingAmount = expenseBaseAmount(expense);
+      if (filters.minAmount != null && reportingAmount < filters.minAmount) return false;
+      if (filters.maxAmount != null && reportingAmount > filters.maxAmount) return false;
       if (text) {
         const haystack = [
           expense.title,
@@ -394,11 +396,16 @@ export function searchExpenses(
     .sort((a, b) => `${b.date}${b.createdAt}`.localeCompare(`${a.date}${a.createdAt}`));
 }
 
-export function hasDuplicateExpense(expenses: Expense[], draft: { amount: number; date: string; title?: string | null }, ignoreId?: string): boolean {
+export function hasDuplicateExpense(expenses: Expense[], draft: { amount: number; currency?: string; date: string; title?: string | null }, ignoreId?: string): boolean {
   const title = draft.title?.trim().toLowerCase() ?? "";
   return expenses.some((expense) => {
     if (expense.id === ignoreId) return false;
-    return expense.date === draft.date && expense.amount === draft.amount && (expense.title?.trim().toLowerCase() ?? "") === title;
+    return (
+      expense.date === draft.date &&
+      expense.amount === draft.amount &&
+      (!draft.currency || expense.currency === draft.currency) &&
+      (expense.title?.trim().toLowerCase() ?? "") === title
+    );
   });
 }
 

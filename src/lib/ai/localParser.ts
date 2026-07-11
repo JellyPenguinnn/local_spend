@@ -5,6 +5,7 @@ import type { Category, ParsedExpenseDraft } from "../types";
 
 interface AmountMatch {
   amount: number;
+  currency?: string;
   raw: string;
   index: number;
   score: number;
@@ -110,6 +111,7 @@ export function parseExpenseLocal(input: string, categories: Category[], today =
 
   return {
     amount: amountMatch.amount,
+    currency: amountMatch.currency,
     date,
     categoryId: categorySuggestion?.categoryId,
     categoryConfidence: categorySuggestion?.confidence,
@@ -132,13 +134,15 @@ function findAmount(text: string): AmountMatch | null {
 
 function collectCurrencyAmounts(text: string): AmountMatch[] {
   const candidates: AmountMatch[] = [];
-  const pattern = /(?:\b(?:sgd|myr|rm)\s*|\bs\$\s*|\$\s*)([0-9][0-9,]*(?:\.\d{1,2})?)\b|\b([0-9][0-9,]*(?:\.\d{1,2})?)\s*(?:sgd|myr|rm)\b/gi;
+  const pattern = /(?:\b(sgd|myr|rm)\s*|\b(s\$)\s*|\$\s*)([0-9][0-9,]*(?:\.\d{1,2})?)\b|\b([0-9][0-9,]*(?:\.\d{1,2})?)\s*(sgd|myr|rm)\b/gi;
   for (const match of text.matchAll(pattern)) {
-    const rawAmount = match[1] ?? match[2];
+    const rawAmount = match[3] ?? match[4];
     const amount = parseAmount(rawAmount);
     if (amount === null) continue;
+    const currencyToken = (match[1] ?? match[2] ?? match[5])?.toLowerCase();
     candidates.push({
       amount,
+      currency: currencyToken ? (currencyToken === "rm" || currencyToken === "myr" ? "MYR" : "SGD") : undefined,
       raw: match[0],
       index: match.index ?? 0,
       score: 8 + (rawAmount.includes(".") ? 1 : 0)

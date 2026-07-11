@@ -44,6 +44,11 @@ pub struct Expense {
     id: String,
     amount: f64,
     currency: String,
+    base_amount: f64,
+    base_currency: String,
+    exchange_rate: f64,
+    exchange_rate_date: String,
+    exchange_rate_source: String,
     date: String,
     category_id: String,
     title: Option<String>,
@@ -87,6 +92,7 @@ pub struct RecurringRule {
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     currency: String,
+    enabled_currencies: Vec<String>,
     theme: String,
     accent_color: String,
     accent_palette: Vec<String>,
@@ -441,6 +447,11 @@ fn initialize_database(conn: &Connection) -> CmdResult<()> {
           id TEXT PRIMARY KEY,
           amount REAL NOT NULL CHECK(amount > 0),
           currency TEXT NOT NULL,
+          base_amount REAL NOT NULL CHECK(base_amount > 0),
+          base_currency TEXT NOT NULL,
+          exchange_rate REAL NOT NULL CHECK(exchange_rate > 0),
+          exchange_rate_date TEXT NOT NULL,
+          exchange_rate_source TEXT NOT NULL,
           date TEXT NOT NULL,
           category_id TEXT NOT NULL,
           title TEXT,
@@ -500,6 +511,13 @@ fn initialize_database(conn: &Connection) -> CmdResult<()> {
     .map_err(|err| format!("Could not initialize database: {err}"))?;
     ensure_recurring_start_date(conn)?;
     ensure_recurring_discarded_dates(conn)?;
+    ensure_expense_currency_snapshot(conn)?;
+    conn.execute(
+        "INSERT OR IGNORE INTO schema_migrations(version, description, applied_at)
+         VALUES (2, 'stable_multi_currency_expense_snapshots', datetime('now'))",
+        [],
+    )
+    .map_err(|err| format!("Could not record multi-currency migration: {err}"))?;
 
     let category_count: i64 = conn
         .query_row("SELECT COUNT(*) FROM categories", [], |row| row.get(0))
@@ -522,6 +540,44 @@ fn initialize_database(conn: &Connection) -> CmdResult<()> {
         write_ai_settings(conn, &default_ai_settings())?;
     }
 
+    Ok(())
+}
+
+fn ensure_expense_currency_snapshot(conn: &Connection) -> CmdResult<()> {
+    let mut stmt = conn
+        .prepare("PRAGMA table_info(expenses)")
+        .map_err(|err| format!("Could not inspect expenses schema: {err}"))?;
+    let columns = stmt
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|err| format!("Could not read expenses schema: {err}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|err| format!("Could not map expenses schema: {err}"))?;
+    drop(stmt);
+
+    for (name, sql_type) in [
+        ("base_amount", "REAL"),
+        ("base_currency", "TEXT"),
+        ("exchange_rate", "REAL"),
+        ("exchange_rate_date", "TEXT"),
+        ("exchange_rate_source", "TEXT"),
+    ] {
+        if !columns.iter().any(|column| column == name) {
+            conn.execute(&format!("ALTER TABLE expenses ADD COLUMN {name} {sql_type}"), [])
+                .map_err(|err| format!("Could not add expense {name}: {err}"))?;
+        }
+    }
+
+    conn.execute(
+        "UPDATE expenses
+         SET base_amount = COALESCE(base_amount, amount),
+             base_currency = COALESCE(NULLIF(base_currency, ''), (SELECT value FROM app_settings WHERE key = 'currency'), currency),
+             exchange_rate = COALESCE(exchange_rate, 1),
+             exchange_rate_date = COALESCE(NULLIF(exchange_rate_date, ''), date),
+             exchange_rate_source = COALESCE(NULLIF(exchange_rate_source, ''),
+               CASE WHEN currency = COALESCE((SELECT value FROM app_settings WHERE key = 'currency'), currency) THEN 'base' ELSE 'legacy' END)",
+        [],
+    )
+    .map_err(|err| format!("Could not backfill expense currency snapshots: {err}"))?;
     Ok(())
 }
 
@@ -664,12 +720,17 @@ fn persist_profile_data(conn: &mut Connection, data: &ProfileData) -> CmdResult<
 
     for expense in &data.expenses {
         tx.execute(
-            "INSERT INTO expenses(id, amount, currency, date, category_id, title, remark, payment_method, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            "INSERT INTO expenses(id, amount, currency, base_amount, base_currency, exchange_rate, exchange_rate_date, exchange_rate_source, date, category_id, title, remark, payment_method, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
             params![
                 expense.id,
                 expense.amount,
                 expense.currency,
+                expense.base_amount,
+                expense.base_currency,
+                expense.exchange_rate,
+                expense.exchange_rate_date,
+                expense.exchange_rate_source,
                 expense.date,
                 expense.category_id,
                 expense.title,
@@ -748,7 +809,7 @@ fn read_categories(conn: &Connection) -> CmdResult<Vec<Category>> {
 fn read_expenses(conn: &Connection) -> CmdResult<Vec<Expense>> {
     let mut stmt = conn
         .prepare(
-            "SELECT id, amount, currency, date, category_id, title, remark, payment_method, created_at, updated_at
+            "SELECT id, amount, currency, COALESCE(base_amount, amount), COALESCE(base_currency, currency), COALESCE(exchange_rate, 1), COALESCE(exchange_rate_date, date), COALESCE(exchange_rate_source, 'legacy'), date, category_id, title, remark, payment_method, created_at, updated_at
              FROM expenses ORDER BY date DESC, created_at DESC",
         )
         .map_err(|err| format!("Could not prepare expenses query: {err}"))?;
@@ -758,13 +819,18 @@ fn read_expenses(conn: &Connection) -> CmdResult<Vec<Expense>> {
                 id: row.get(0)?,
                 amount: row.get(1)?,
                 currency: row.get(2)?,
-                date: row.get(3)?,
-                category_id: row.get(4)?,
-                title: row.get(5)?,
-                remark: row.get(6)?,
-                payment_method: row.get(7)?,
-                created_at: row.get(8)?,
-                updated_at: row.get(9)?,
+                base_amount: row.get(3)?,
+                base_currency: row.get(4)?,
+                exchange_rate: row.get(5)?,
+                exchange_rate_date: row.get(6)?,
+                exchange_rate_source: row.get(7)?,
+                date: row.get(8)?,
+                category_id: row.get(9)?,
+                title: row.get(10)?,
+                remark: row.get(11)?,
+                payment_method: row.get(12)?,
+                created_at: row.get(13)?,
+                updated_at: row.get(14)?,
             })
         })
         .map_err(|err| format!("Could not read expenses: {err}"))?;
@@ -825,6 +891,17 @@ fn read_recurring_rules(conn: &Connection) -> CmdResult<Vec<RecurringRule>> {
 
 fn read_app_settings(conn: &Connection) -> CmdResult<AppSettings> {
     let currency = read_setting(conn, "currency")?.unwrap_or_else(|| "SGD".to_string());
+    let enabled_currencies = read_setting(conn, "enabledCurrencies")?
+        .and_then(|value| serde_json::from_str::<Vec<String>>(&value).ok())
+        .map(|values| normalize_enabled_currencies(values, &currency))
+        .unwrap_or_else(|| {
+            let defaults = if currency == "SGD" {
+                vec!["SGD".to_string(), "MYR".to_string()]
+            } else {
+                vec![currency.clone()]
+            };
+            normalize_enabled_currencies(defaults, &currency)
+        });
     let theme = normalize_theme(&read_setting(conn, "theme")?.unwrap_or_else(|| "light".to_string()));
     let accent_color = read_setting(conn, "accentColor")?.unwrap_or_else(|| "#315fbd".to_string());
     let accent_palette = read_setting(conn, "accentPalette")?
@@ -847,6 +924,7 @@ fn read_app_settings(conn: &Connection) -> CmdResult<AppSettings> {
         .unwrap_or(0.34);
     Ok(AppSettings {
         currency,
+        enabled_currencies,
         theme,
         accent_color,
         accent_palette,
@@ -869,6 +947,11 @@ fn write_app_settings(conn: &Connection, settings: &AppSettings) -> CmdResult<()
         params![settings.currency],
     )
     .map_err(|err| format!("Could not write currency setting: {err}"))?;
+    conn.execute(
+        "INSERT OR REPLACE INTO app_settings(key, value) VALUES ('enabledCurrencies', ?1)",
+        params![serde_json::to_string(&normalize_enabled_currencies(settings.enabled_currencies.clone(), &settings.currency)).map_err(|err| err.to_string())?],
+    )
+    .map_err(|err| format!("Could not write enabled currencies: {err}"))?;
     conn.execute(
         "INSERT OR REPLACE INTO app_settings(key, value) VALUES ('theme', ?1)",
         params![settings.theme],
@@ -958,6 +1041,7 @@ fn default_profile_data() -> ProfileData {
 fn default_app_settings() -> AppSettings {
     AppSettings {
         currency: "SGD".to_string(),
+        enabled_currencies: vec!["SGD".to_string(), "MYR".to_string()],
         theme: "light".to_string(),
         accent_color: "#315fbd".to_string(),
         accent_palette: default_accent_palette(),
@@ -966,6 +1050,21 @@ fn default_app_settings() -> AppSettings {
         active_wallpaper_id: None,
         wallpaper_opacity: 0.34,
     }
+}
+
+fn normalize_enabled_currencies(currencies: Vec<String>, base_currency: &str) -> Vec<String> {
+    let base = base_currency.trim().to_uppercase();
+    let mut values = vec![base.clone()];
+    for currency in currencies {
+        let normalized = currency.trim().to_uppercase();
+        if normalized.len() == 3
+            && normalized.chars().all(|char| char.is_ascii_alphabetic())
+            && !values.contains(&normalized)
+        {
+            values.push(normalized);
+        }
+    }
+    values
 }
 
 fn default_accent_palette() -> Vec<String> {
@@ -1130,6 +1229,11 @@ mod tests {
             id: "exp_test".to_string(),
             amount: 12.50,
             currency: "SGD".to_string(),
+            base_amount: 12.50,
+            base_currency: "SGD".to_string(),
+            exchange_rate: 1.0,
+            exchange_rate_date: "2026-07-07".to_string(),
+            exchange_rate_source: "base".to_string(),
             date: "2026-07-07".to_string(),
             category_id: data.categories[0].id.clone(),
             title: Some("Lunch".to_string()),
@@ -1161,5 +1265,36 @@ mod tests {
         assert_eq!(loaded.expenses[0].title.as_deref(), Some("Lunch"));
         assert_eq!(loaded.categories.len(), 14);
         assert_eq!(loaded.recurring_rules[0].discarded_dates, vec!["2026-06-05"]);
+    }
+
+    #[test]
+    fn migrates_legacy_expenses_to_stable_base_currency_snapshots() {
+        let conn = Connection::open_in_memory().expect("in-memory sqlite");
+        conn.execute_batch(
+            "CREATE TABLE expenses (
+               id TEXT PRIMARY KEY,
+               amount REAL NOT NULL,
+               currency TEXT NOT NULL,
+               date TEXT NOT NULL,
+               category_id TEXT NOT NULL,
+               title TEXT,
+               remark TEXT,
+               payment_method TEXT,
+               created_at TEXT NOT NULL,
+               updated_at TEXT NOT NULL
+             );
+             CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+             INSERT INTO app_settings(key, value) VALUES ('currency', 'SGD');
+             INSERT INTO expenses(id, amount, currency, date, category_id, title, created_at, updated_at)
+             VALUES ('legacy', 8.50, 'SGD', '2026-07-01', 'cat_food_drinks', 'Lunch', '2026-07-01T00:00:00Z', '2026-07-01T00:00:00Z');",
+        )
+        .expect("legacy schema");
+
+        initialize_database(&conn).expect("database migration");
+        let expenses = read_expenses(&conn).expect("migrated expenses");
+        assert_eq!(expenses[0].base_amount, 8.50);
+        assert_eq!(expenses[0].base_currency, "SGD");
+        assert_eq!(expenses[0].exchange_rate, 1.0);
+        assert_eq!(expenses[0].exchange_rate_source, "base");
     }
 }

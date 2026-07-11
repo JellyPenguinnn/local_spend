@@ -2,6 +2,7 @@ import type { ParsedExpenseDraft } from "../types";
 
 export interface AiExpenseJson {
   amount: number;
+  currency?: string;
   date: string;
   categoryName?: string;
   title?: string;
@@ -25,6 +26,7 @@ export const expenseJsonSchema = {
   additionalProperties: false,
   properties: {
     amount: { type: "number" },
+    currency: { type: "string", description: "ISO 4217 code only when explicitly stated" },
     date: { type: "string", description: "Local date in YYYY-MM-DD format" },
     categoryName: { type: "string" },
     title: { type: "string" },
@@ -80,6 +82,7 @@ export function validateAiExpenseJson(value: unknown): AiExpenseJson {
   if (typeof value.confidence !== "number") throw new Error("AI response did not include confidence.");
   return {
     amount: value.amount,
+    currency: normalizeCurrency(value.currency),
     date: value.date,
     categoryName: optionalString(value.categoryName),
     title: optionalString(value.title),
@@ -113,6 +116,7 @@ export function validateAiInsightsJson(value: unknown): AiInsightsJson {
 export function mapAiExpenseToDraft(value: AiExpenseJson, categoryId?: string): ParsedExpenseDraft {
   return {
     amount: value.amount,
+    currency: value.currency,
     date: value.date,
     categoryId,
     categoryConfidence: categoryId ? value.confidence : undefined,
@@ -134,4 +138,10 @@ function optionalString(value: unknown): string | undefined {
 
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
+}
+
+function normalizeCurrency(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const currency = value.trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(currency) ? currency : undefined;
 }

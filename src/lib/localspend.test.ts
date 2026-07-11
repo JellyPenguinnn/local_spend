@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildMonthlyInsightCards, calculateSafeToSpend, getCategoryTotals, getUpcomingRecurringItems, hasDuplicateExpense, summarizeMonth, suggestFromExpenseHistory } from "./analytics";
 import { restoreBackup, createBackup } from "./backup";
 import { suggestCategoryLocal } from "./categories";
 import { exportExpensesCsv, importExpensesCsv } from "./csv";
 import { resetSpendingData } from "./dataControls";
 import { buildCalendarMonth, formatLocalIsoDate, previousMonthKey } from "./date";
+import { fetchReferenceRate, normalizeEnabledCurrencies } from "./currencies";
 import { createDefaultProfileData, normalizeAccentPalette, normalizeRecurringRules } from "./defaults";
 import { parseExpenseLocal } from "./ai/localParser";
 import { parseExpenseWithAiOrLocal } from "./ai/providers";
@@ -22,6 +23,10 @@ import {
 import { createRepository } from "./storage/repository";
 import { MAX_WALLPAPERS, clampWallpaperOpacity, trimWallpapers } from "./wallpaper";
 import type { Expense, ProfileMeta, RecurringRule, WallpaperImage } from "./types";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("money formatting and parsing", () => {
   it("rounds, parses, and formats SGD amounts", () => {
@@ -145,6 +150,23 @@ describe("expense CRUD helpers and summaries", () => {
     expect(summary.deterministicComments.some((comment) => comment.includes("less than last month"))).toBe(true);
   });
 
+  it("aggregates foreign expenses using their stable base-currency value", () => {
+    const data = createDefaultProfileData();
+    const sgd = makeExpense(data.categories[0].id, "2026-07-01", 10, "Lunch");
+    const myr: Expense = {
+      ...makeExpense(data.categories[1].id, "2026-07-02", 30, "Petrol"),
+      currency: "MYR",
+      baseAmount: 9.15,
+      baseCurrency: "SGD",
+      exchangeRate: 0.305,
+      exchangeRateDate: "2026-07-02",
+      exchangeRateSource: "ecb-reference"
+    };
+    const summary = summarizeMonth([sgd, myr], data.categories, "2026-07");
+    expect(summary.total).toBe(19.15);
+    expect(summary.categoryTotals.find((item) => item.categoryId === data.categories[1].id)?.total).toBe(9.15);
+  });
+
   it("calculates safe-to-spend, review cards, and upcoming recurring items", () => {
     const data = createDefaultProfileData();
     const budget = { id: "budget_1", month: "2026-07", categoryId: null, amount: 310 };
@@ -211,6 +233,29 @@ describe("CSV import/export and backups", () => {
     expect(imported.errors).toContain("Line 2: date must be YYYY-MM-DD.");
   });
 
+  it("preserves original and base currency snapshots through CSV", () => {
+    const data = createDefaultProfileData();
+    const expense: Expense = {
+      ...makeExpense(data.categories[0].id, "2026-07-07", 18, "Nasi lemak"),
+      currency: "MYR",
+      baseAmount: 5.49,
+      baseCurrency: "SGD",
+      exchangeRate: 0.305,
+      exchangeRateDate: "2026-07-07",
+      exchangeRateSource: "ecb-reference"
+    };
+    const imported = importExpensesCsv(exportExpensesCsv([expense], data.categories), data.categories, "SGD");
+    expect(imported.errors).toHaveLength(0);
+    expect(imported.expenses[0]).toMatchObject({
+      amount: 18,
+      currency: "MYR",
+      baseAmount: 5.49,
+      baseCurrency: "SGD",
+      exchangeRate: 0.305,
+      exchangeRateSource: "ecb-reference"
+    });
+  });
+
   it("serializes and restores JSON backups for active profile data", () => {
     const data = createDefaultProfileData();
     const profile: ProfileMeta = {
@@ -225,6 +270,33 @@ describe("CSV import/export and backups", () => {
     expect(restored.error).toBeUndefined();
     expect(restored.data?.categories).toHaveLength(data.categories.length);
     expect(restored.data?.aiSettings.apiKeySaved).toBe(false);
+  });
+
+  it("restores version 1 expenses without changing their historical totals", () => {
+    const data = createDefaultProfileData();
+    const legacyExpense = makeExpense(data.categories[0].id, "2026-07-07", 6.5, "Lunch") as Partial<Expense>;
+    delete legacyExpense.baseAmount;
+    delete legacyExpense.baseCurrency;
+    delete legacyExpense.exchangeRate;
+    delete legacyExpense.exchangeRateDate;
+    delete legacyExpense.exchangeRateSource;
+    const restored = restoreBackup(
+      JSON.stringify({
+        app: "LocalSpend",
+        version: 1,
+        exportedAt: "2026-07-07T00:00:00.000Z",
+        profile: { id: "legacy", displayName: "Legacy" },
+        data: { ...data, expenses: [legacyExpense], appSettings: { ...data.appSettings, enabledCurrencies: undefined } }
+      })
+    );
+    expect(restored.data?.expenses[0]).toMatchObject({
+      amount: 6.5,
+      baseAmount: 6.5,
+      baseCurrency: "SGD",
+      exchangeRate: 1,
+      exchangeRateSource: "base"
+    });
+    expect(restored.data?.appSettings.enabledCurrencies).toEqual(["SGD", "MYR"]);
   });
 
   it("rejects invalid JSON backup data clearly", () => {
@@ -294,6 +366,16 @@ describe("AI parsing and local category rules", () => {
     expect(parsed?.paymentMethod).toBe("PayNow");
     expect(parsed?.categoryId).toBe("cat_food_drinks");
     expect(parsed?.title).toBe("mcdonald lunch");
+    expect(parsed?.currency).toBe("SGD");
+  });
+
+  it("recognizes Malaysian Ringgit without leaving currency text in the title", () => {
+    const data = createDefaultProfileData();
+    const parsed = parseExpenseLocal("RM 18 nasi lemak cash", data.categories, "2026-07-07", data.appSettings.paymentMethods);
+    expect(parsed?.amount).toBe(18);
+    expect(parsed?.currency).toBe("MYR");
+    expect(parsed?.paymentMethod).toBe("Cash");
+    expect(parsed?.title).toBe("nasi lemak");
   });
 
   it("does not treat calendar dates as the amount", () => {
@@ -421,6 +503,29 @@ describe("AI parsing and local category rules", () => {
     );
     expect(parsed?.categoryId).toBe("cat_food_drinks");
     expect(parsed?.paymentMethod).toBe("Credit Card");
+  });
+});
+
+describe("currency settings and reference rates", () => {
+  it("keeps the base currency enabled and defaults Singapore profiles to SGD and MYR", () => {
+    expect(normalizeEnabledCurrencies(undefined, "SGD")).toEqual(["SGD", "MYR"]);
+    expect(normalizeEnabledCurrencies(["USD", "USD"], "MYR")).toEqual(["MYR", "USD"]);
+  });
+
+  it("loads and caches a dated reference rate without personal spending data", async () => {
+    localStorage.clear();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ date: "2026-07-03", base: "MYR", quote: "SGD", rate: 0.317 })
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const first = await fetchReferenceRate("MYR", "SGD", "2026-07-05");
+    const second = await fetchReferenceRate("MYR", "SGD", "2026-07-05");
+    expect(first).toMatchObject({ rate: 0.317, date: "2026-07-03", source: "ecb-reference" });
+    expect(second.source).toBe("cached");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/MYR/SGD");
+    expect(String(fetchMock.mock.calls[0][0])).not.toContain("expense");
   });
 });
 
@@ -643,6 +748,11 @@ function makeExpense(categoryId: string, date: string, amount: number, title: st
     id: `exp_${title}_${date}`,
     amount,
     currency: "SGD",
+    baseAmount: amount,
+    baseCurrency: "SGD",
+    exchangeRate: 1,
+    exchangeRateDate: date,
+    exchangeRateSource: "base",
     date,
     categoryId,
     title,

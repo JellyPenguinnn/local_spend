@@ -1,8 +1,9 @@
 import { type ChangeEvent, type CSSProperties, useState } from "react";
-import { CalendarDays, Check, Download, Pencil, Plus, RotateCcw, Trash2, Upload } from "lucide-react";
+import { CalendarDays, Check, Download, Pencil, Plus, RotateCcw, Trash2, Upload, X } from "lucide-react";
 import { CategoryChip } from "../components/CategoryChip";
 import { createBackup, restoreBackup } from "../lib/backup";
 import { canDeleteCategory } from "../lib/categories";
+import { CURRENCY_OPTIONS, normalizeEnabledCurrencies } from "../lib/currencies";
 import { exportExpensesCsv, importExpensesCsv } from "../lib/csv";
 import { resetSpendingData as resetProfileSpendingData } from "../lib/dataControls";
 import { compareIsoDates, formatLocalIsoDate, parseLocalDate } from "../lib/date";
@@ -33,24 +34,6 @@ const SETTINGS_SECTIONS: Array<{ key: SettingsSection; label: string }> = [
   { key: "bills", label: "Bills" },
   { key: "categories", label: "Categories" },
   { key: "payments", label: "Payments" }
-];
-
-const CURRENCY_OPTIONS = [
-  { code: "SGD", label: "SGD - Singapore dollar" },
-  { code: "MYR", label: "MYR - Malaysian ringgit" },
-  { code: "USD", label: "USD - US dollar" },
-  { code: "EUR", label: "EUR - Euro" },
-  { code: "GBP", label: "GBP - British pound" },
-  { code: "JPY", label: "JPY - Japanese yen" },
-  { code: "AUD", label: "AUD - Australian dollar" },
-  { code: "CAD", label: "CAD - Canadian dollar" },
-  { code: "CNY", label: "CNY - Chinese yuan" },
-  { code: "HKD", label: "HKD - Hong Kong dollar" },
-  { code: "THB", label: "THB - Thai baht" },
-  { code: "IDR", label: "IDR - Indonesian rupiah" },
-  { code: "PHP", label: "PHP - Philippine peso" },
-  { code: "KRW", label: "KRW - Korean won" },
-  { code: "TWD", label: "TWD - Taiwan dollar" }
 ];
 
 const CADENCE_OPTIONS: Array<{ value: RecurringCadence; label: string }> = [
@@ -97,6 +80,7 @@ function isDuplicateImportedExpense(expense: ProfileData["expenses"][number], ex
     return (
       item.date === expense.date &&
       item.amount === expense.amount &&
+      item.currency === expense.currency &&
       item.categoryId === expense.categoryId &&
       (item.title?.trim().toLowerCase() ?? "") === title
     );
@@ -191,6 +175,38 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
         ...patch
       }
     });
+  }
+
+  async function changeBaseCurrency(currency: string) {
+    if (currency === data.appSettings.currency) return;
+    if (data.expenses.length > 0 || data.budgets.length > 0 || data.recurringRules.length > 0) {
+      setStatus("Base currency is locked after spending, budgets, or bills are recorded. Add another spending currency instead.");
+      return;
+    }
+    await updateSettings({
+      currency,
+      enabledCurrencies: normalizeEnabledCurrencies(data.appSettings.enabledCurrencies, currency)
+    });
+    setStatus("");
+  }
+
+  async function addSpendingCurrency(currency: string) {
+    if (!currency) return;
+    await updateSettings({
+      enabledCurrencies: normalizeEnabledCurrencies([...data.appSettings.enabledCurrencies, currency], data.appSettings.currency)
+    });
+    setStatus("");
+  }
+
+  async function removeSpendingCurrency(currency: string) {
+    if (currency === data.appSettings.currency) return;
+    await updateSettings({
+      enabledCurrencies: normalizeEnabledCurrencies(
+        data.appSettings.enabledCurrencies.filter((item) => item !== currency),
+        data.appSettings.currency
+      )
+    });
+    setStatus("");
   }
 
   async function exportJsonBackup() {
@@ -536,8 +552,8 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
         <div className="appearance-blocks">
           <section className="panel settings-panel appearance-block">
             <label>
-              <span>Currency</span>
-              <select value={data.appSettings.currency} onChange={(event) => void updateSettings({ currency: event.target.value })}>
+              <span>Base currency</span>
+              <select value={data.appSettings.currency} onChange={(event) => void changeBaseCurrency(event.target.value)}>
                 {CURRENCY_OPTIONS.map((currency) => (
                   <option key={currency.code} value={currency.code}>
                     {currency.label}
@@ -545,6 +561,32 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
                 ))}
               </select>
             </label>
+            <p className="settings-help">Used for calendar totals, summaries, and budgets.</p>
+            <div className="enabled-currency-field">
+              <span>Spending currencies</span>
+              <div className="currency-chip-row">
+                {data.appSettings.enabledCurrencies.map((currency) => (
+                  <span className={currency === data.appSettings.currency ? "currency-chip base" : "currency-chip"} key={currency}>
+                    {currency}
+                    {currency !== data.appSettings.currency && (
+                      <button type="button" onClick={() => void removeSpendingCurrency(currency)} aria-label={`Remove ${currency}`} title={`Remove ${currency}`}>
+                        <X size={13} />
+                      </button>
+                    )}
+                  </span>
+                ))}
+              </div>
+              {data.appSettings.enabledCurrencies.length < CURRENCY_OPTIONS.length && (
+                <select className="currency-add-select" value="" onChange={(event) => void addSpendingCurrency(event.target.value)} aria-label="Add spending currency">
+                  <option value="">Add currency...</option>
+                  {CURRENCY_OPTIONS.filter((option) => !data.appSettings.enabledCurrencies.includes(option.code)).map((currency) => (
+                    <option key={currency.code} value={currency.code}>
+                      {currency.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
           </section>
           <section className="panel settings-panel appearance-block">
             <div className="mode-field">

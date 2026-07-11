@@ -37,3 +37,9 @@ The category donut chart is lazy-loaded so the daily tracker does not load Recha
 Recurring reminders are derived from each rule's start date and cadence, not only from a mutable next-due pointer. Every scheduled date is handled independently: an exact matching expense records it, while a user discard stores that date in the rule's `discardedDates` list. This prevents duplicate reminders, preserves missed-cycle reminders after schedule edits, and keeps later occurrences independent.
 
 Discarding is persistent during normal use so the reminder stays gone. Any deliberate edit-and-save of that bill clears its discarded dates and recalculates reminders; exact matching expenses still suppress already-recorded occurrences.
+
+## Stable Multi-Currency Transactions
+
+Each expense remains one record. It stores the original amount/currency plus a base amount, base currency, exchange rate, rate date, and source captured at save time. Calendar totals, summaries, category distribution, and budgets use the base amount; transaction details preserve and foreground the original amount.
+
+Historical expenses are never revalued when reference rates change. Foreign entries try a dated ECB reference through Frankfurter, fall back to a locally cached or previously saved rate, and always allow a manual converted amount. The profile base currency is locked after spending, budgets, or recurring rules exist so reporting currencies cannot be mixed silently.

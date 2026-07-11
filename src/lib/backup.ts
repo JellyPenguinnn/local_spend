@@ -1,10 +1,11 @@
 import { createDefaultProfileData, normalizeAccentPalette, normalizeRecurringRules } from "./defaults";
+import { normalizeCurrencyCode, normalizeEnabledCurrencies, normalizeExpenses } from "./currencies";
 import type { ProfileData, ProfileMeta, ThemeKey } from "./types";
 import { clampWallpaperOpacity, trimWallpapers } from "./wallpaper";
 
 export interface LocalSpendBackup {
   app: "LocalSpend";
-  version: 1;
+  version: 1 | 2;
   exportedAt: string;
   profile: Pick<ProfileMeta, "id" | "displayName">;
   data: ProfileData;
@@ -13,7 +14,7 @@ export interface LocalSpendBackup {
 export function createBackup(profile: ProfileMeta, data: ProfileData): string {
   const backup: LocalSpendBackup = {
     app: "LocalSpend",
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     profile: {
       id: profile.id,
@@ -27,7 +28,7 @@ export function createBackup(profile: ProfileMeta, data: ProfileData): string {
 export function restoreBackup(json: string): { data: ProfileData | null; error?: string } {
   try {
     const parsed = JSON.parse(json) as Partial<LocalSpendBackup>;
-    if (parsed.app !== "LocalSpend" || parsed.version !== 1 || !parsed.data) {
+    if (parsed.app !== "LocalSpend" || ![1, 2].includes(parsed.version ?? 0) || !parsed.data) {
       return { data: null, error: "This does not look like a LocalSpend backup." };
     }
     const fallback = createDefaultProfileData();
@@ -36,7 +37,8 @@ export function restoreBackup(json: string): { data: ProfileData | null; error?:
     const wallpapers = trimWallpapers(Array.isArray(data.appSettings?.wallpapers) ? data.appSettings.wallpapers : []);
     const activeWallpaperId =
       data.appSettings?.activeWallpaperId && wallpapers.some((wallpaper) => wallpaper.id === data.appSettings?.activeWallpaperId) ? data.appSettings.activeWallpaperId : null;
-    const expenses = Array.isArray(data.expenses) ? data.expenses : [];
+    const currency = normalizeCurrencyCode(data.appSettings?.currency, fallback.appSettings.currency);
+    const expenses = normalizeExpenses(data.expenses, currency);
     return {
       data: {
         categories: Array.isArray(data.categories) && data.categories.length > 0 ? data.categories : fallback.categories,
@@ -46,6 +48,8 @@ export function restoreBackup(json: string): { data: ProfileData | null; error?:
         appSettings: {
           ...fallback.appSettings,
           ...(data.appSettings ?? {}),
+          currency,
+          enabledCurrencies: normalizeEnabledCurrencies(data.appSettings?.enabledCurrencies, currency),
           theme: restoredTheme,
           accentColor: data.appSettings?.accentColor ?? fallback.appSettings.accentColor,
           accentPalette: normalizeAccentPalette(data.appSettings?.accentPalette),

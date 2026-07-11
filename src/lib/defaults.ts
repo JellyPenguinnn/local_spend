@@ -43,6 +43,7 @@ export const DEFAULT_CATEGORIES: Category[] = [
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   currency: DEFAULT_CURRENCY,
+  enabledCurrencies: ["SGD", "MYR"],
   theme: "light",
   accentColor: "#315fbd",
   accentPalette: DEFAULT_ACCENT_PALETTE,
@@ -70,7 +71,8 @@ export function createDefaultProfileData(): ProfileData {
     appSettings: {
       ...DEFAULT_APP_SETTINGS,
       accentPalette: [...DEFAULT_ACCENT_PALETTE],
-      paymentMethods: [...DEFAULT_PAYMENT_METHODS]
+      paymentMethods: [...DEFAULT_PAYMENT_METHODS],
+      enabledCurrencies: [...DEFAULT_APP_SETTINGS.enabledCurrencies]
     },
     aiSettings: { ...DEFAULT_AI_SETTINGS }
   };

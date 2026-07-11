@@ -61,6 +61,7 @@
 - Finalized the defaults and discard reset: new spending starts at Food & Drinks with the most-used payment method (PayNow for first use), and editing/saving a bill silently resets discarded reminders without a separate restore interface.
 - Added unit tests for core local logic.
 - Verified lint, TypeScript/web build, JS tests, Rust SQLite tests, and Tauri `.app` build.
+- Added stable mixed-currency expenses: original and base values, dated reference/manual conversion, SGD/MYR quick selection, base-safe analytics and budgets, SQLite/browser migrations, dual-value details, and lossless CSV/JSON portability.
 
 ## Follow-Up Polish
 

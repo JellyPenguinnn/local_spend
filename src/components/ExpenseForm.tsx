@@ -1,12 +1,13 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, Check, RotateCcw } from "lucide-react";
+import { CalendarDays, Check, RefreshCw, RotateCcw } from "lucide-react";
 import { hasDuplicateExpense, suggestFromExpenseHistory } from "../lib/analytics";
 import { suggestCategoryLocal } from "../lib/categories";
+import { fetchReferenceRate, latestKnownRate, normalizeCurrencyCode } from "../lib/currencies";
 import { parseLocalDate } from "../lib/date";
 import { createId, nowIso } from "../lib/defaults";
-import { parseMoney } from "../lib/money";
+import { parseMoney, roundMoney } from "../lib/money";
 import { mostUsedPaymentMethod } from "../lib/payments";
-import type { AppSettings, Category, Expense, ExpenseDraft } from "../lib/types";
+import type { AppSettings, Category, ExchangeRateSource, Expense, ExpenseDraft } from "../lib/types";
 
 interface ExpenseFormProps {
   categories: Category[];
@@ -46,6 +47,8 @@ export function ExpenseForm({
   const defaultPaymentMethod = mostUsedPaymentMethod(expenses, settings.paymentMethods);
   const [draft, setDraft] = useState<ExpenseDraft>(() => ({
     amount: "",
+    currency: settings.currency,
+    baseAmount: "",
     date: defaultDate,
     categoryId: defaultCategoryId,
     title: "",
@@ -55,24 +58,39 @@ export function ExpenseForm({
   }));
   const [error, setError] = useState("");
   const [didSave, setDidSave] = useState(false);
+  const [rateState, setRateState] = useState<{ rate: number; date: string; source: ExchangeRateSource } | null>(null);
+  const [rateStatus, setRateStatus] = useState<"idle" | "loading" | "ready" | "unavailable">("idle");
+  const [isBaseAmountManual, setIsBaseAmountManual] = useState(false);
+  const [rateRefreshNonce, setRateRefreshNonce] = useState(0);
   const amount = typeof draft.amount === "number" ? draft.amount : parseMoney(String(draft.amount));
+  const isForeignCurrency = normalizeCurrencyCode(draft.currency) !== normalizeCurrencyCode(settings.currency);
+  const currencyChoices = settings.enabledCurrencies.includes(draft.currency) ? settings.enabledCurrencies : [...settings.enabledCurrencies, draft.currency];
   const suggestion = useMemo(() => suggestCategoryLocal(`${draft.title} ${draft.remark}`, categories), [categories, draft.remark, draft.title]);
   const memorySuggestion = useMemo(
     () => suggestFromExpenseHistory(`${draft.title} ${draft.remark}`, expenses, editingExpense?.id),
     [draft.remark, draft.title, editingExpense?.id, expenses]
   );
-  const duplicate = amount !== null && hasDuplicateExpense(expenses, { amount, date: draft.date, title: draft.title }, editingExpense?.id);
+  const duplicate = amount !== null && hasDuplicateExpense(expenses, { amount, currency: draft.currency, date: draft.date, title: draft.title }, editingExpense?.id);
 
   useEffect(() => {
     if (editingExpense) {
       setDraft({
         amount: editingExpense.amount,
+        currency: editingExpense.currency,
+        baseAmount: editingExpense.baseAmount,
         date: editingExpense.date,
         categoryId: editingExpense.categoryId,
         title: editingExpense.title ?? "",
         remark: editingExpense.remark ?? "",
         paymentMethod: editingExpense.paymentMethod ?? defaultPaymentMethod
       });
+      setRateState({
+        rate: editingExpense.exchangeRate,
+        date: editingExpense.exchangeRateDate,
+        source: editingExpense.exchangeRateSource
+      });
+      setRateStatus("ready");
+      setIsBaseAmountManual(editingExpense.exchangeRateSource === "manual");
     }
   }, [defaultPaymentMethod, editingExpense]);
 
@@ -83,6 +101,8 @@ export function ExpenseForm({
         date: initialDraft?.date ?? defaultDate,
         categoryId: initialDraft?.categoryId ?? current.categoryId,
         amount: initialDraft?.amount ?? current.amount,
+        currency: initialDraft?.currency ?? current.currency,
+        baseAmount: initialDraft?.baseAmount ?? current.baseAmount,
         title: initialDraft?.title ?? current.title,
         remark: initialDraft?.remark ?? current.remark,
         paymentMethod: initialDraft?.paymentMethod ?? current.paymentMethod
@@ -96,8 +116,76 @@ export function ExpenseForm({
     }
   }, [autoFocusAmount, editingExpense]);
 
+  useEffect(() => {
+    if (!isForeignCurrency) {
+      setRateState({ rate: 1, date: draft.date, source: "base" });
+      setRateStatus("ready");
+      setIsBaseAmountManual(false);
+      setDraft((current) => ({ ...current, baseAmount: current.amount }));
+      return;
+    }
+
+    if (
+      editingExpense &&
+      rateRefreshNonce === 0 &&
+      draft.currency === editingExpense.currency &&
+      draft.date === editingExpense.date &&
+      editingExpense.baseCurrency === settings.currency
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    setRateStatus("loading");
+    setIsBaseAmountManual(false);
+    void fetchReferenceRate(draft.currency, settings.currency, draft.date)
+      .catch(() => latestKnownRate(expenses, draft.currency, settings.currency, draft.date))
+      .then((quote) => {
+        if (cancelled) return;
+        if (!quote) {
+          setRateState(null);
+          setRateStatus("unavailable");
+          setDraft((current) => ({ ...current, baseAmount: "" }));
+          return;
+        }
+        setRateState(quote);
+        setRateStatus("ready");
+        setDraft((current) => {
+          const parsed = typeof current.amount === "number" ? current.amount : parseMoney(String(current.amount));
+          return { ...current, baseAmount: parsed === null ? "" : roundMoney(parsed * quote.rate) };
+        });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [draft.currency, draft.date, editingExpense, expenses, isForeignCurrency, rateRefreshNonce, settings.currency]);
+
   function update<K extends keyof ExpenseDraft>(key: K, value: ExpenseDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
+    setError("");
+  }
+
+  function updateAmount(value: string) {
+    setDraft((current) => {
+      const parsed = parseMoney(value);
+      const baseAmount = !isBaseAmountManual && rateState && parsed !== null ? roundMoney(parsed * rateState.rate) : current.baseAmount;
+      return { ...current, amount: value, baseAmount };
+    });
+    setError("");
+  }
+
+  function updateCurrency(value: string) {
+    setRateState(null);
+    setRateStatus("idle");
+    setIsBaseAmountManual(false);
+    setRateRefreshNonce(0);
+    setDraft((current) => ({ ...current, currency: value, baseAmount: value === settings.currency ? current.amount : "" }));
+    setError("");
+  }
+
+  function updateBaseAmount(value: string) {
+    setDraft((current) => ({ ...current, baseAmount: value }));
+    setIsBaseAmountManual(true);
     setError("");
   }
 
@@ -116,11 +204,26 @@ export function ExpenseForm({
       setError("Choose a category.");
       return;
     }
+    const parsedBaseAmount = isForeignCurrency
+      ? typeof draft.baseAmount === "number"
+        ? draft.baseAmount
+        : parseMoney(String(draft.baseAmount))
+      : parsedAmount;
+    if (parsedBaseAmount === null) {
+      setError(`Enter the ${settings.currency} equivalent so totals stay accurate.`);
+      return;
+    }
+    const exchangeRate = isForeignCurrency ? parsedBaseAmount / parsedAmount : 1;
     const timestamp = nowIso();
     const expense: Expense = {
       id: editingExpense?.id ?? createId("exp"),
       amount: parsedAmount,
-      currency: settings.currency,
+      currency: normalizeCurrencyCode(draft.currency, settings.currency),
+      baseAmount: roundMoney(parsedBaseAmount),
+      baseCurrency: settings.currency,
+      exchangeRate,
+      exchangeRateDate: isForeignCurrency ? (isBaseAmountManual ? draft.date : (rateState?.date ?? draft.date)) : draft.date,
+      exchangeRateSource: isForeignCurrency ? (isBaseAmountManual ? "manual" : (rateState?.source ?? "manual")) : "base",
       date: draft.date,
       categoryId: draft.categoryId,
       title: draft.title.trim() || null,
@@ -136,12 +239,14 @@ export function ExpenseForm({
         setDraft((current) => ({
           ...current,
           amount: "",
+          baseAmount: "",
           title: "",
           remark: "",
           date: current.date,
           categoryId: current.categoryId,
           paymentMethod: current.paymentMethod
         }));
+        setIsBaseAmountManual(false);
       }
     }, 180);
   }
@@ -187,17 +292,47 @@ export function ExpenseForm({
       )}
       {hideTitleRow && duplicate && <p className="form-note warning">This looks similar to an existing expense.</p>}
       <div className="expense-grid">
-        <label className="amount-field">
-          <span>Amount</span>
+        <div className="amount-field">
+          <div className="amount-label-row">
+            <span>Amount</span>
+            <select className="currency-select" value={draft.currency} onChange={(event) => updateCurrency(event.target.value)} aria-label="Spending currency">
+              {currencyChoices.map((currency) => (
+                <option key={currency} value={currency}>
+                  {currency}
+                </option>
+              ))}
+            </select>
+          </div>
           <input
             ref={amountInputRef}
+            aria-label="Amount"
             autoFocus={autoFocusAmount && !editingExpense}
             inputMode="decimal"
             value={draft.amount}
             placeholder="0.00"
-            onChange={(event) => update("amount", event.target.value)}
+            onChange={(event) => updateAmount(event.target.value)}
           />
-        </label>
+        </div>
+        {isForeignCurrency && (
+          <div className="currency-conversion span-2">
+            <label>
+              <span>In {settings.currency}</span>
+              <input inputMode="decimal" value={draft.baseAmount} placeholder="0.00" onChange={(event) => updateBaseAmount(event.target.value)} />
+            </label>
+            <div className="currency-rate-note">
+              <span>{formatRateNote(rateStatus, rateState, draft.currency, settings.currency, isBaseAmountManual)}</span>
+              <button
+                className="icon-button currency-rate-refresh"
+                type="button"
+                onClick={() => setRateRefreshNonce((value) => value + 1)}
+                aria-label="Refresh reference rate"
+                title="Refresh reference rate"
+              >
+                <RefreshCw size={15} />
+              </button>
+            </div>
+          </div>
+        )}
         {afterAmount && <div className="span-2 expense-alternate-entry">{afterAmount}</div>}
         {!hideDate && (
           <label>
@@ -252,4 +387,21 @@ export function ExpenseForm({
 function formatDateForField(value: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Choose date";
   return new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short", year: "numeric" }).format(parseLocalDate(value));
+}
+
+function formatRateNote(
+  status: "idle" | "loading" | "ready" | "unavailable",
+  rate: { rate: number; date: string; source: ExchangeRateSource } | null,
+  fromCurrency: string,
+  toCurrency: string,
+  isManual: boolean
+): string {
+  if (isManual) return "Using your converted amount";
+  if (status === "loading") return "Finding the dated reference rate...";
+  if (!rate || status === "unavailable") return "Reference unavailable. Enter the converted amount.";
+  const source = rate.source === "cached" ? "Saved reference" : rate.source === "ecb-reference" ? "ECB reference" : "Reference rate";
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(rate.date)
+    ? new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short" }).format(parseLocalDate(rate.date))
+    : rate.date;
+  return `1 ${fromCurrency} = ${rate.rate.toFixed(4)} ${toCurrency} · ${source}, ${date}`;
 }
