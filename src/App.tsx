@@ -9,7 +9,7 @@ import { SummaryScreen } from "./screens/SummaryScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { ProfileSwitcher } from "./components/ProfileSwitcher";
 import { clampWallpaperOpacity } from "./lib/wallpaper";
-import { restoreBackup } from "./lib/backup";
+import { MAX_BACKUP_FILE_BYTES, restoreBackup } from "./lib/backup";
 import { resolveRecurringRuleNextDate } from "./lib/recurring";
 
 const NAV_ITEMS: Array<{ key: ViewKey; label: string; icon: typeof ClipboardList }> = [
@@ -138,6 +138,7 @@ export default function App() {
   }
 
   async function restoreFirstProfile(file: File): Promise<string | null> {
+    if (file.size > MAX_BACKUP_FILE_BYTES) return "Choose a LocalSpend backup under 12 MB.";
     const restored = restoreBackup(await file.text());
     if (!restored.data) return restored.error ?? "Could not restore that backup.";
     let createdProfileId: string | null = null;

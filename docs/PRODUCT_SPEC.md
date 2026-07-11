@@ -59,9 +59,11 @@
 
 - CSV export/import applies only to active profile expenses.
 - CSV stores original and base amounts plus exchange-rate metadata so mixed-currency history can be restored accurately.
-- JSON backup/restore applies only to the active profile's data payload.
+- CSV import validates dates and money values, skips duplicates, and safely preserves text that spreadsheet apps could otherwise interpret as formulas.
+- JSON backup/restore applies only to the active profile and includes expenses, bills, budgets, categories, payment methods, currencies, appearance, and wallpapers. API secrets are excluded.
+- Restore validates the complete backup before changing data, previews its contents, and downloads a safety backup of the current profile first.
 - Desktop exports/backups are also saved under the active profile's `exports/` or `backups/` folder.
-- Reset clears only the active profile after confirmation.
+- Reset downloads a safety backup, then clears expenses, budgets, and recurring bills for only the active profile after confirmation. Categories and appearance remain.
 
 ## Acceptance Criteria
 
@@ -70,6 +72,6 @@
 - Expense CRUD works from core screens.
 - Calendar and Summary handle empty and populated months.
 - Deterministic comments work without AI.
-- CSV import/export and JSON backup/restore work on active profile only.
+- CSV import/export and validated JSON backup/restore work on the active profile only.
 - AI settings do not require secrets in source code.
 - Typecheck, lint, unit tests, web build, and feasible Tauri build pass or are reported.

@@ -168,11 +168,10 @@ Recurring bills also keep their own spending currency. When a foreign-currency b
 
 LocalSpend includes profile-scoped data controls in Settings:
 
-- Export expenses as CSV.
-- Import expenses from CSV.
-- Create a JSON backup.
-- Restore from a JSON backup.
-- Reset local spending data after confirmation.
+- **Backup all / Restore all** use a validated JSON snapshot containing entries, bills, budgets, categories, payment methods, currencies, and appearance. API secrets are never included.
+- Restore previews the backup contents and downloads a safety copy of current data before replacement.
+- **Export CSV / Import CSV** handle expenses only, preserve mixed-currency snapshots, reject invalid rows, and skip duplicates.
+- Reset downloads a safety backup first, then clears entries, budgets, and bills while keeping categories and appearance.
 
 Back up before deleting the PWA, clearing Safari website data, resetting the app, or switching devices.
 
@@ -212,7 +211,7 @@ cargo test
 ## Known Limitations
 
 - PWA data is local to the browser/PWA install and does not sync across phones.
-- Browser/PWA storage is not a replacement for encrypted cloud backup; use JSON backup/export for important data.
+- Browser/PWA storage requests persistent mode where supported, but it is not a replacement for an external backup; use **Backup all** for important data.
 - The hosted PWA uses browser storage, while the macOS Tauri app uses SQLite.
 - Native iOS App Store/TestFlight distribution is not part of v1.
 - Cloud AI provider setup is disabled in the simplified v1 UI; natural quick add uses local parsing.

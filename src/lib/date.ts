@@ -25,6 +25,14 @@ export function parseLocalDate(value: string): Date {
   return new Date(year, month - 1, day, 12, 0, 0, 0);
 }
 
+export function isValidLocalIsoDate(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return false;
+  const parsed = new Date(year, month - 1, day, 12, 0, 0, 0);
+  return parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === day;
+}
+
 export function formatMonthKey(date = new Date(), timeZone = DEFAULT_TIME_ZONE): string {
   return formatLocalIsoDate(date, timeZone).slice(0, 7);
 }

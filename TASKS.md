@@ -69,6 +69,7 @@
 - Refined Calendar, Summary, and General settings copy: Calendar now uses the literal `Spending by day` heading, budget status leads with the amount remaining and one concise percentage line, and currency settings separate the locked reporting currency from optional removable spending currencies with a reliable native Add picker.
 - Corrected exchange-rate freshness: current quotes expire after 30 minutes and refresh automatically when a later form needs them, historical quotes remain reusable, weekend/holiday provider dates read as `Latest reference`, and only genuine offline fallback reads as a saved offline rate.
 - Simplified foreign entry: automatic base-currency conversion is now a read-only reporting value, with manual input shown only when no rate is available; General settings now marks the locked main currency with a compact lock cue.
+- Hardened local data controls: complete validated JSON backups, automatic safety backups before restore/reset, persistent browser-storage requests, file-size/date/reference checks, duplicate-safe CSV import, and spreadsheet-formula-safe CSV export.
 
 ## Follow-Up Polish
 

@@ -2,10 +2,10 @@ import { type ChangeEvent, type CSSProperties, useState } from "react";
 import { CalendarDays, Check, Download, Lock, Pencil, Plus, RotateCcw, Trash2, Upload, X } from "lucide-react";
 import { CategoryChip } from "../components/CategoryChip";
 import { FormBackAction } from "../components/FormBackAction";
-import { createBackup, restoreBackup } from "../lib/backup";
+import { MAX_BACKUP_FILE_BYTES, createBackup, restoreBackup, summarizeProfileData, type ProfileDataSummary } from "../lib/backup";
 import { canDeleteCategory } from "../lib/categories";
 import { CURRENCY_OPTIONS, normalizeEnabledCurrencies } from "../lib/currencies";
-import { exportExpensesCsv, importExpensesCsv } from "../lib/csv";
+import { MAX_CSV_FILE_BYTES, exportExpensesCsv, findNewImportedExpenses, importExpensesCsv } from "../lib/csv";
 import { resetSpendingData as resetProfileSpendingData } from "../lib/dataControls";
 import { compareIsoDates, formatLocalIsoDate, parseLocalDate } from "../lib/date";
 import { createId, MAX_ACCENT_PALETTE_COLORS, normalizeAccentPalette, nowIso } from "../lib/defaults";
@@ -54,7 +54,7 @@ function formatDateForField(value: string): string {
 }
 
 function dateStamp(): string {
-  return new Date().toISOString().slice(0, 10);
+  return formatLocalIsoDate();
 }
 
 function slugify(value: string): string {
@@ -72,36 +72,39 @@ function downloadTextFile(fileName: string, contents: string, mimeType: string):
   document.body.append(anchor);
   anchor.click();
   anchor.remove();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function isDuplicateImportedExpense(expense: ProfileData["expenses"][number], existing: ProfileData["expenses"]): boolean {
-  const title = expense.title?.trim().toLowerCase() ?? "";
-  return existing.some((item) => {
-    return (
-      item.date === expense.date &&
-      item.amount === expense.amount &&
-      item.currency === expense.currency &&
-      item.categoryId === expense.categoryId &&
-      (item.title?.trim().toLowerCase() ?? "") === title
-    );
-  });
-}
-
-function backupIsDue(lastBackupAt: string | null | undefined, expenseCount: number): boolean {
-  if (expenseCount === 0) return false;
+function backupIsDue(lastBackupAt: string | null | undefined, recordCount: number): boolean {
+  if (recordCount === 0) return false;
   if (!lastBackupAt) return true;
   const timestamp = Date.parse(lastBackupAt);
   return !Number.isFinite(timestamp) || Date.now() - timestamp > 30 * 24 * 60 * 60 * 1000;
 }
 
-function backupLabel(lastBackupAt: string | null | undefined, expenseCount: number): string {
-  if (expenseCount === 0 && !lastBackupAt) return "No backup needed yet.";
+function backupLabel(lastBackupAt: string | null | undefined, recordCount: number): string {
+  if (recordCount === 0 && !lastBackupAt) return "No backup needed yet.";
   if (!lastBackupAt) return "No backup yet. Save one before moving or resetting this app.";
   const timestamp = Date.parse(lastBackupAt);
   if (!Number.isFinite(timestamp)) return "Backup recommended.";
   const label = new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short", year: "numeric" }).format(new Date(timestamp));
-  return backupIsDue(lastBackupAt, expenseCount) ? `Last backup: ${label} · New backup recommended.` : `Last backup: ${label}`;
+  return backupIsDue(lastBackupAt, recordCount) ? `Last backup: ${label} · New backup recommended.` : `Last backup: ${label}`;
+}
+
+function countLabel(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function dataSummaryLabel(summary: ProfileDataSummary, includeCategories = false): string {
+  const parts = [countLabel(summary.expenses, "entry", "entries"), countLabel(summary.recurringRules, "bill")];
+  if (summary.budgets > 0) parts.push(countLabel(summary.budgets, "budget"));
+  if (includeCategories) parts.push(countLabel(summary.categories, "category", "categories"));
+  if (includeCategories && summary.wallpapers > 0) parts.push(countLabel(summary.wallpapers, "wallpaper"));
+  return parts.join(" · ");
+}
+
+function dataErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
 }
 
 export function SettingsScreen({ activeProfile, data, repository, saveData }: SettingsScreenProps) {
@@ -119,9 +122,17 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
   const [isEditingPayments, setIsEditingPayments] = useState(false);
   const [isEditingAccentPalette, setIsEditingAccentPalette] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
-  const [pendingRestore, setPendingRestore] = useState<{ fileName: string; data: ProfileData } | null>(null);
-  const [pendingCsvImport, setPendingCsvImport] = useState<{ fileName: string; count: number; errors: string[]; expenses: ProfileData["expenses"] } | null>(null);
+  const [pendingRestore, setPendingRestore] = useState<{ fileName: string; data: ProfileData; exportedAt: string; summary: ProfileDataSummary } | null>(null);
+  const [pendingCsvImport, setPendingCsvImport] = useState<{
+    fileName: string;
+    count: number;
+    duplicateCount: number;
+    errors: string[];
+    expenses: ProfileData["expenses"];
+  } | null>(null);
   const [isResettingData, setIsResettingData] = useState(false);
+  const [isDataBusy, setIsDataBusy] = useState(false);
+  const [dataStatus, setDataStatus] = useState("");
   const accentPalette = normalizeAccentPalette(data.appSettings.accentPalette);
   const currentAccent = data.appSettings.accentColor.toLowerCase();
   const isAccentSaved = accentPalette.includes(currentAccent);
@@ -183,6 +194,9 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
     recurringDraftSaveRulePreview && compareIsoDates(recurringDraftSaveRulePreview.nextDate, today) <= 0 ? today : recurringDraftSaveRulePreview?.nextDate;
   const recurringDraftAlreadyRecorded = recurringDraftStartRulePreview ? hasRecordedRecurringExpense(data.expenses, recurringDraftStartRulePreview) : false;
   const isBaseCurrencyLocked = data.expenses.length > 0 || data.budgets.length > 0 || data.recurringRules.length > 0;
+  const dataSummary = summarizeProfileData(data);
+  const backupRecordCount = dataSummary.expenses + dataSummary.budgets + dataSummary.recurringRules + dataSummary.wallpapers;
+  const hasResettableData = dataSummary.expenses + dataSummary.budgets + dataSummary.recurringRules > 0;
   const recurringDraftNextUnrecordedDate =
     recurringDraftSaveRulePreview && recurringDraftAdvanceCutoff
       ? (recurringScheduleChanged
@@ -230,76 +244,155 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
     setStatus("");
   }
 
-  async function exportJsonBackup() {
-    const contents = createBackup(activeProfile, data);
-    const fileName = `localspend-${slugify(activeProfile.displayName)}-${dateStamp()}-backup.json`;
+  async function saveBackupSnapshot(sourceData: ProfileData, suffix: "backup" | "before-restore" | "before-reset"): Promise<string> {
+    const exportedAt = nowIso();
+    const contents = createBackup(activeProfile, sourceData, exportedAt);
+    const fileName = `localspend-${slugify(activeProfile.displayName)}-${dateStamp()}-${suffix}.json`;
     await repository.saveProfileFile(activeProfile.id, "backup", fileName, contents);
     downloadTextFile(fileName, contents, "application/json");
-    await updateSettings({ lastBackupAt: nowIso() });
-    setStatus("");
+    return exportedAt;
+  }
+
+  async function exportJsonBackup() {
+    if (isDataBusy) return;
+    setIsDataBusy(true);
+    setDataStatus("");
+    try {
+      const exportedAt = await saveBackupSnapshot(data, "backup");
+      await updateSettings({ lastBackupAt: exportedAt });
+    } catch (error) {
+      setDataStatus(dataErrorMessage(error, "Could not create the backup."));
+    } finally {
+      setIsDataBusy(false);
+    }
   }
 
   async function exportCsv() {
-    const contents = exportExpensesCsv(data.expenses, data.categories);
-    const fileName = `localspend-${slugify(activeProfile.displayName)}-${dateStamp()}-expenses.csv`;
-    await repository.saveProfileFile(activeProfile.id, "export", fileName, contents);
-    downloadTextFile(fileName, contents, "text/csv");
-    setStatus("");
+    if (isDataBusy) return;
+    setIsDataBusy(true);
+    setDataStatus("");
+    try {
+      const contents = exportExpensesCsv(data.expenses, data.categories);
+      const fileName = `localspend-${slugify(activeProfile.displayName)}-${dateStamp()}-expenses.csv`;
+      await repository.saveProfileFile(activeProfile.id, "export", fileName, contents);
+      downloadTextFile(fileName, contents, "text/csv");
+    } catch (error) {
+      setDataStatus(dataErrorMessage(error, "Could not export the CSV."));
+    } finally {
+      setIsDataBusy(false);
+    }
   }
 
   async function prepareJsonRestore(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.currentTarget.value = "";
     if (!file) return;
-    const result = restoreBackup(await file.text());
-    if (!result.data) {
-      setStatus(result.error ?? "Could not read that backup.");
-      return;
-    }
-    setPendingRestore({ fileName: file.name, data: result.data });
+    setDataStatus("");
+    setPendingRestore(null);
     setPendingCsvImport(null);
     setIsResettingData(false);
-    setStatus("");
+    if (file.size > MAX_BACKUP_FILE_BYTES) {
+      setDataStatus("Choose a LocalSpend backup under 12 MB.");
+      return;
+    }
+    try {
+      const result = restoreBackup(await file.text());
+      if (!result.data || !result.summary || !result.exportedAt) {
+        setDataStatus(result.error ?? "Could not read that backup.");
+        return;
+      }
+      setPendingRestore({ fileName: file.name, data: result.data, exportedAt: result.exportedAt, summary: result.summary });
+    } catch (error) {
+      setDataStatus(dataErrorMessage(error, "Could not read that backup."));
+    }
   }
 
   async function confirmJsonRestore() {
-    if (!pendingRestore) return;
-    if (!(await saveData(pendingRestore.data))) return;
-    setPendingRestore(null);
-    setStatus("");
+    if (!pendingRestore || isDataBusy) return;
+    setIsDataBusy(true);
+    setDataStatus("");
+    try {
+      await saveBackupSnapshot(data, "before-restore");
+      if (!(await saveData(pendingRestore.data))) return;
+      setPendingRestore(null);
+    } catch (error) {
+      setDataStatus(dataErrorMessage(error, "Could not restore the backup."));
+    } finally {
+      setIsDataBusy(false);
+    }
   }
 
   async function prepareCsvImport(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.currentTarget.value = "";
     if (!file) return;
-    const result = importExpensesCsv(await file.text(), data.categories, data.appSettings.currency);
-    const expenses = result.expenses.filter((expense) => !isDuplicateImportedExpense(expense, data.expenses));
-    if (expenses.length === 0) {
-      setStatus(result.errors.length > 0 ? result.errors[0] : "No new expenses found.");
-      return;
-    }
-    setPendingCsvImport({ fileName: file.name, count: expenses.length, errors: result.errors, expenses });
+    setDataStatus("");
+    setPendingCsvImport(null);
     setPendingRestore(null);
     setIsResettingData(false);
-    setStatus("");
+    if (file.size > MAX_CSV_FILE_BYTES) {
+      setDataStatus("Choose a CSV file under 8 MB.");
+      return;
+    }
+    try {
+      const result = importExpensesCsv(await file.text(), data.categories, data.appSettings.currency);
+      const { expenses, duplicateCount } = findNewImportedExpenses(result.expenses, data.expenses);
+      if (expenses.length === 0) {
+        setDataStatus(result.errors[0] ?? (duplicateCount > 0 ? "Every CSV entry is already recorded." : "No new expenses found."));
+        return;
+      }
+      setPendingCsvImport({ fileName: file.name, count: expenses.length, duplicateCount, errors: result.errors, expenses });
+    } catch (error) {
+      setDataStatus(dataErrorMessage(error, "Could not read that CSV."));
+    }
   }
 
   async function confirmCsvImport() {
-    if (!pendingCsvImport) return;
-    const saved = await saveData({
-      ...data,
-      expenses: [...data.expenses, ...pendingCsvImport.expenses]
-    });
-    if (!saved) return;
-    setPendingCsvImport(null);
-    setStatus("");
+    if (!pendingCsvImport || isDataBusy) return;
+    setIsDataBusy(true);
+    setDataStatus("");
+    try {
+      const importedCurrencies = pendingCsvImport.expenses.map((expense) => expense.currency);
+      const importedPayments = pendingCsvImport.expenses.flatMap((expense) => expense.paymentMethod ? [expense.paymentMethod] : []);
+      const paymentMethods = [...data.appSettings.paymentMethods];
+      for (const method of importedPayments) {
+        if (!paymentMethods.some((existing) => existing.toLowerCase() === method.toLowerCase())) paymentMethods.push(method);
+      }
+      const saved = await saveData({
+        ...data,
+        expenses: [...data.expenses, ...pendingCsvImport.expenses],
+        appSettings: {
+          ...data.appSettings,
+          enabledCurrencies: normalizeEnabledCurrencies([...data.appSettings.enabledCurrencies, ...importedCurrencies], data.appSettings.currency),
+          paymentMethods
+        }
+      });
+      if (!saved) return;
+      setPendingCsvImport(null);
+    } catch (error) {
+      setDataStatus(dataErrorMessage(error, "Could not import the CSV."));
+    } finally {
+      setIsDataBusy(false);
+    }
   }
 
   async function resetSpendingData() {
-    if (!(await saveData(resetProfileSpendingData(data)))) return;
-    setIsResettingData(false);
-    setStatus("");
+    if (!hasResettableData || isDataBusy) return;
+    setIsDataBusy(true);
+    setDataStatus("");
+    try {
+      const backedUpAt = await saveBackupSnapshot(data, "before-reset");
+      const resetData = resetProfileSpendingData(data);
+      if (!(await saveData({
+        ...resetData,
+        appSettings: { ...resetData.appSettings, lastBackupAt: backedUpAt }
+      }))) return;
+      setIsResettingData(false);
+    } catch (error) {
+      setDataStatus(dataErrorMessage(error, "Could not back up and reset spending."));
+    } finally {
+      setIsDataBusy(false);
+    }
   }
 
   async function saveAccentToPalette() {
@@ -577,6 +670,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
               setPendingRestore(null);
               setPendingCsvImport(null);
               setIsResettingData(false);
+              setDataStatus("");
               setIsEditingCategories(false);
               setIsEditingPayments(false);
               setIsEditingAccentPalette(false);
@@ -805,82 +899,99 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
             </div>
             </div>
           </section>
-          <section className="panel settings-panel appearance-block data-control-card">
+          <section className="panel settings-panel appearance-block data-control-card" aria-busy={isDataBusy}>
             <div className="account-card-head">
               <span>Data</span>
             </div>
-            <div className="data-action-grid">
-              <button className="secondary-button" type="button" onClick={() => void exportJsonBackup()}>
-                <Download size={16} />
-                Backup
-              </button>
-              <label className="file-button data-file-button">
-                <Upload size={16} />
-                Restore
-                <input type="file" accept="application/json,.json" onChange={(event) => void prepareJsonRestore(event)} />
-              </label>
-              <button className="secondary-button" type="button" onClick={() => void exportCsv()}>
-                <Download size={16} />
-                Export CSV
-              </button>
-              <label className="file-button data-file-button">
-                <Upload size={16} />
-                Import CSV
-                <input type="file" accept=".csv,text/csv" onChange={(event) => void prepareCsvImport(event)} />
-              </label>
+            {dataStatus && <p className="form-note warning data-status" role="alert">{dataStatus}</p>}
+            <div className="data-action-group">
+              <span className="data-action-label">All data</span>
+              <div className="data-action-grid">
+                <button className="secondary-button" type="button" disabled={isDataBusy} onClick={() => void exportJsonBackup()}>
+                  <Download size={16} />
+                  Backup all
+                </button>
+                <label className={isDataBusy ? "file-button data-file-button disabled" : "file-button data-file-button"}>
+                  <Upload size={16} />
+                  Restore all
+                  <input type="file" accept="application/json,.json" disabled={isDataBusy} onChange={(event) => void prepareJsonRestore(event)} />
+                </label>
+              </div>
+              <p className={backupIsDue(data.appSettings.lastBackupAt, backupRecordCount) ? "form-note warning backup-freshness" : "muted small backup-freshness"}>
+                {backupLabel(data.appSettings.lastBackupAt, backupRecordCount)}
+              </p>
             </div>
-            <p className={backupIsDue(data.appSettings.lastBackupAt, data.expenses.length) ? "form-note warning backup-freshness" : "muted small backup-freshness"}>
-              {backupLabel(data.appSettings.lastBackupAt, data.expenses.length)}
-            </p>
+            <div className="data-action-group csv-actions">
+              <span className="data-action-label">Expenses only</span>
+              <div className="data-action-grid">
+                <button className="secondary-button" type="button" disabled={isDataBusy} onClick={() => void exportCsv()}>
+                  <Download size={16} />
+                  Export CSV
+                </button>
+                <label className={isDataBusy ? "file-button data-file-button disabled" : "file-button data-file-button"}>
+                  <Upload size={16} />
+                  Import CSV
+                  <input type="file" accept=".csv,text/csv" disabled={isDataBusy} onChange={(event) => void prepareCsvImport(event)} />
+                </label>
+              </div>
+            </div>
             {pendingRestore && (
               <div className="data-confirm-box">
-                <span>Restore {pendingRestore.fileName}?</span>
+                <strong>Restore all data?</strong>
+                <small className="data-file-name">{pendingRestore.fileName}</small>
+                <span>{dataSummaryLabel(pendingRestore.summary, true)}</span>
+                <p>Current data is backed up first, then replaced.</p>
                 <div>
-                  <button className="secondary-button" type="button" onClick={() => setPendingRestore(null)}>
+                  <button className="secondary-button" type="button" disabled={isDataBusy} onClick={() => setPendingRestore(null)}>
                     Cancel
                   </button>
-                  <button className="secondary-button danger-button" type="button" onClick={() => void confirmJsonRestore()}>
-                    Restore
+                  <button className="secondary-button danger-button" type="button" disabled={isDataBusy} onClick={() => void confirmJsonRestore()}>
+                    Backup & restore
                   </button>
                 </div>
               </div>
             )}
             {pendingCsvImport && (
               <div className="data-confirm-box">
-                <span>
-                  Import {pendingCsvImport.count} expenses
-                  {pendingCsvImport.errors.length > 0 ? `, ${pendingCsvImport.errors.length} skipped` : ""}?
-                </span>
+                <strong>Import {countLabel(pendingCsvImport.count, "entry", "entries")}?</strong>
+                <small className="data-file-name">{pendingCsvImport.fileName}</small>
+                {(pendingCsvImport.duplicateCount > 0 || pendingCsvImport.errors.length > 0) && (
+                  <p>
+                    {countLabel(pendingCsvImport.duplicateCount + pendingCsvImport.errors.length, "row")} skipped as duplicate or invalid.
+                  </p>
+                )}
                 <div>
-                  <button className="secondary-button" type="button" onClick={() => setPendingCsvImport(null)}>
+                  <button className="secondary-button" type="button" disabled={isDataBusy} onClick={() => setPendingCsvImport(null)}>
                     Cancel
                   </button>
-                  <button className="secondary-button" type="button" onClick={() => void confirmCsvImport()}>
+                  <button className="secondary-button" type="button" disabled={isDataBusy} onClick={() => void confirmCsvImport()}>
                     Import
                   </button>
                 </div>
               </div>
             )}
-            <div className="data-reset-row">
+            {hasResettableData && <div className="data-reset-row">
               {isResettingData ? (
                 <div className="data-confirm-box danger">
-                  <span>Clear spending, budgets, and bills?</span>
+                  <strong>Reset spending?</strong>
+                  <span>{dataSummaryLabel(dataSummary)}</span>
+                  <p>Categories and appearance stay. A backup downloads first.</p>
                   <div>
-                    <button className="secondary-button" type="button" onClick={() => setIsResettingData(false)}>
+                    <button className="secondary-button" type="button" disabled={isDataBusy} onClick={() => setIsResettingData(false)}>
                       Cancel
                     </button>
-                    <button className="secondary-button danger-button" type="button" onClick={() => void resetSpendingData()}>
-                      Reset
+                    <button className="secondary-button danger-button" type="button" disabled={isDataBusy} onClick={() => void resetSpendingData()}>
+                      Backup & reset
                     </button>
                   </div>
                 </div>
               ) : (
-                <button className="secondary-button danger-button data-reset-button" type="button" onClick={() => setIsResettingData(true)}>
+                <button className="secondary-button danger-button data-reset-button" type="button" disabled={isDataBusy} onClick={() => setIsResettingData(true)}>
                   <RotateCcw size={16} />
                   Reset spending
                 </button>
               )}
-            </div>
+            </div>}
           </section>
         </div>
       )}

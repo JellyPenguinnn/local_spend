@@ -52,6 +52,7 @@ export function ExpenseForm({
   const amountInputRef = useRef<HTMLInputElement>(null);
   const dateInputRef = useRef<HTMLInputElement>(null);
   const categoryInputRef = useRef<HTMLSelectElement>(null);
+  const savedTimeoutRef = useRef<number | null>(null);
   const defaultCategoryId = categories.find((category) => category.name.toLowerCase() === "food & drinks")?.id ?? categories[0]?.id ?? "";
   const defaultPaymentMethod = mostUsedPaymentMethod(expenses, settings.paymentMethods);
   const [draft, setDraft] = useState<ExpenseDraft>(() => {
@@ -116,6 +117,12 @@ export function ExpenseForm({
   useEffect(() => {
     if (draft.remark) setIsRemarkOpen(true);
   }, [draft.remark]);
+
+  useEffect(() => {
+    return () => {
+      if (savedTimeoutRef.current !== null) window.clearTimeout(savedTimeoutRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!editingExpense) {
@@ -283,7 +290,7 @@ export function ExpenseForm({
     clearExpenseDraft(draftStorageKey);
     setDidSave(true);
     setIsSaving(false);
-    window.setTimeout(() => onSaved?.(), 220);
+    savedTimeoutRef.current = window.setTimeout(() => onSaved?.(), 220);
   }
 
   function applyMemorySuggestion() {

@@ -107,7 +107,7 @@ Researched on 2026-07-10.
 - YNAB recommends separate plans for separate currencies, which avoids exchange-rate ambiguity but fragments a single monthly view. That is too heavy for LocalSpend's common SGD-with-occasional-MYR use case: https://support.ynab.com/en_us/using-multiple-currencies-in-ynab-a-guide-SyBF6PHno
 - The ECB publishes working-day reference rates for both MYR and SGD and notes that reference rates are informational, not necessarily the rate used for an actual card or cash transaction: https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html
 - Frankfurter provides a browser-safe, no-key API over central-bank data, supports historical dates, and allows an ECB-only provider filter: https://frankfurter.dev/ and https://frankfurter.dev/providers/ecb/
-- LocalSpend therefore stores one transaction with two values: original amount/currency and a dated base-currency snapshot. Summaries and budgets use the snapshot; details and exports preserve the amount paid. A user can override the reference conversion to match a bank statement or cash exchange rate.
+- LocalSpend therefore stores one transaction with two values: original amount/currency and a dated base-currency snapshot. Summaries and budgets use the snapshot; details and exports preserve the amount paid. Automatic references are read-only; manual base amounts are requested only when no reference is available.
 
 ## Final Daily-Use Audit
 
@@ -125,3 +125,12 @@ Researched on 2026-07-11.
 - ECB reference rates are normally published around 16:00 CET on working days, excluding TARGET closing days. A Friday quote is therefore the correct latest available reference on Saturday or Sunday: https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html
 - Frankfurter exposes the latest working-day data and historical dates over a no-key API. Its returned quote date can legitimately be earlier than the requested calendar date on weekends and holidays: https://frankfurter.dev/
 - LocalSpend now keeps current-date quotes fresh for 30 minutes, automatically requests another when a later form needs a stale quote, preserves immutable historical quotes, and labels genuine offline fallback separately from the latest available provider reference.
+
+## Local Data Safety
+
+Researched on 2026-07-11.
+
+- WebKit and MDN document that browser storage is normally best-effort and can be evicted, while the Storage API can request persistent storage. LocalSpend requests persistence after a user save when supported, but still treats an external backup as the recovery copy: https://webkit.org/blog/14403/updates-to-storage-policy/ and https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria
+- IndexedDB is the appropriate browser store for structured, transactional local data. LocalSpend writes the complete active profile atomically rather than splitting related records across separate localStorage writes: https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Basic_Terminology
+- Actual Budget separates complete backups from data import/export and recommends backing up before a restore. LocalSpend follows that pattern: JSON is the complete recovery format, CSV is expense interchange, and restore/reset create a safety backup first: https://actualbudget.org/docs/backup-restore/backup/ and https://actualbudget.org/docs/backup-restore/restore/
+- OWASP notes that spreadsheet programs may execute cells beginning with formula characters. LocalSpend neutralizes those cells on CSV export and removes only its own escape marker on import for a safe round trip: https://owasp.org/www-community/attacks/CSV_Injection

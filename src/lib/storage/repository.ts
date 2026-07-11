@@ -120,6 +120,7 @@ class BrowserRepository implements LocalSpendRepository {
       profiles: [...state.profiles, profile]
     };
     await this.writeProfileData(profile.id, createDefaultProfileData());
+    await requestPersistentBrowserStorage();
     this.writeProfiles(next);
     return next;
   }
@@ -172,6 +173,7 @@ class BrowserRepository implements LocalSpendRepository {
 
   async saveProfileData(profileId: string, data: ProfileData): Promise<ProfileData> {
     await this.writeProfileData(profileId, data);
+    await requestPersistentBrowserStorage();
     return data;
   }
 
@@ -268,9 +270,21 @@ const BROWSER_DB_NAME = "localspend";
 const BROWSER_DB_VERSION = 1;
 const BROWSER_PROFILE_STORE = "profileData";
 let browserDbPromise: Promise<IDBDatabase> | null = null;
+let browserPersistenceRequested = false;
 
 function supportsIndexedDb(): boolean {
   return typeof indexedDB !== "undefined";
+}
+
+async function requestPersistentBrowserStorage(): Promise<void> {
+  if (browserPersistenceRequested || typeof navigator === "undefined" || !navigator.storage?.persist) return;
+  browserPersistenceRequested = true;
+  try {
+    if (navigator.storage.persisted && (await navigator.storage.persisted())) return;
+    await navigator.storage.persist();
+  } catch {
+    // Persistence is best-effort; explicit backups remain the recovery path.
+  }
 }
 
 function openBrowserDatabase(): Promise<IDBDatabase> {

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildMonthlyInsightCards, calculateSafeToSpend, getCategoryTotals, getUpcomingRecurringItems, hasDuplicateExpense, summarizeMonth, suggestFromExpenseHistory } from "./analytics";
-import { restoreBackup, createBackup } from "./backup";
+import { restoreBackup, createBackup, summarizeProfileData } from "./backup";
 import { suggestCategoryLocal } from "./categories";
-import { exportExpensesCsv, importExpensesCsv } from "./csv";
+import { exportExpensesCsv, findNewImportedExpenses, importExpensesCsv } from "./csv";
 import { resetSpendingData } from "./dataControls";
 import { buildCalendarMonth, formatLocalIsoDate, previousMonthKey } from "./date";
 import { fetchReferenceRate, latestCachedRate, normalizeEnabledCurrencies } from "./currencies";
@@ -25,7 +25,7 @@ import {
 } from "./recurring";
 import { createRepository } from "./storage/repository";
 import { MAX_WALLPAPERS, clampWallpaperOpacity, trimWallpapers } from "./wallpaper";
-import type { Expense, ProfileMeta, RecurringRule, WallpaperImage } from "./types";
+import type { Expense, ProfileData, ProfileMeta, RecurringRule, WallpaperImage } from "./types";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -257,6 +257,36 @@ describe("CSV import/export and backups", () => {
     expect(imported.errors).toContain("Line 2: date must be YYYY-MM-DD.");
   });
 
+  it("rejects impossible dates and unfinished quoted CSV values", () => {
+    const data = createDefaultProfileData();
+    const impossible = importExpensesCsv("date,amount,category\n2026-02-30,5,Food & Drinks", data.categories, "SGD");
+    expect(impossible.expenses).toHaveLength(0);
+    expect(impossible.errors).toContain("Line 2: date must be YYYY-MM-DD.");
+
+    const unfinished = importExpensesCsv('date,amount,category,title\n2026-02-28,5,Food & Drinks,"Lunch', data.categories, "SGD");
+    expect(unfinished.expenses).toHaveLength(0);
+    expect(unfinished.errors).toEqual(["The CSV has an unfinished quoted value."]);
+  });
+
+  it("rejects malformed currencies and oversized CSV text fields", () => {
+    const data = createDefaultProfileData();
+    const invalidCurrency = importExpensesCsv(
+      "date,amount,currency,category\n2026-07-11,5,SING,Food & Drinks",
+      data.categories,
+      "SGD"
+    );
+    expect(invalidCurrency.expenses).toHaveLength(0);
+    expect(invalidCurrency.errors).toContain("Line 2: currency must use a three-letter code.");
+
+    const oversizedTitle = importExpensesCsv(
+      `date,amount,category,title\n2026-07-11,5,Food & Drinks,${"x".repeat(241)}`,
+      data.categories,
+      "SGD"
+    );
+    expect(oversizedTitle.expenses).toHaveLength(0);
+    expect(oversizedTitle.errors).toContain("Line 2: description, remark, or payment text is too long.");
+  });
+
   it("preserves original and base currency snapshots through CSV", () => {
     const data = createDefaultProfileData();
     const expense: Expense = {
@@ -280,6 +310,42 @@ describe("CSV import/export and backups", () => {
     });
   });
 
+  it("neutralizes spreadsheet formulas while keeping CSV round trips lossless", () => {
+    const data = createDefaultProfileData();
+    const expense = {
+      ...makeExpense(data.categories[0].id, "2026-07-07", 6.5, "=SUM(1,2)"),
+      remark: "@external"
+    };
+    const csv = exportExpensesCsv([expense], data.categories);
+    expect(csv).toContain("'=SUM(1,2)");
+    expect(csv).toContain("'@external");
+    const imported = importExpensesCsv(csv, data.categories, "SGD");
+    expect(imported.errors).toHaveLength(0);
+    expect(imported.expenses[0]).toMatchObject({ title: "=SUM(1,2)", remark: "@external" });
+  });
+
+  it("skips duplicates already saved and repeated within the same CSV", () => {
+    const data = createDefaultProfileData();
+    const expense = makeExpense(data.categories[0].id, "2026-07-07", 6.5, "Lunch");
+    const imported = importExpensesCsv(exportExpensesCsv([expense, expense], data.categories), data.categories, "SGD");
+    const merged = findNewImportedExpenses(imported.expenses, []);
+    expect(merged.expenses).toHaveLength(1);
+    expect(merged.duplicateCount).toBe(1);
+
+    const againstExisting = findNewImportedExpenses(imported.expenses, [expense]);
+    expect(againstExisting.expenses).toHaveLength(0);
+    expect(againstExisting.duplicateCount).toBe(2);
+  });
+
+  it("keeps same-price expenses when their payment details differ", () => {
+    const data = createDefaultProfileData();
+    const first = makeExpense(data.categories[0].id, "2026-07-07", 6.5, "Lunch");
+    const second = { ...first, id: "exp_second", paymentMethod: "Cash", remark: "For a friend" };
+    const merged = findNewImportedExpenses([second], [first]);
+    expect(merged.expenses).toEqual([second]);
+    expect(merged.duplicateCount).toBe(0);
+  });
+
   it("serializes and restores JSON backups for active profile data", () => {
     const data = createDefaultProfileData();
     const profile: ProfileMeta = {
@@ -289,11 +355,36 @@ describe("CSV import/export and backups", () => {
       createdAt: "2026-07-07T00:00:00Z",
       updatedAt: "2026-07-07T00:00:00Z"
     };
-    const json = createBackup(profile, data);
+    data.expenses = [makeExpense(data.categories[0].id, "2026-07-07", 6.5, "Lunch")];
+    data.aiSettings.apiKeySaved = true;
+    const exportedAt = "2026-07-11T12:00:00.000Z";
+    const json = createBackup(profile, data, exportedAt);
+    const raw = JSON.parse(json) as { data: ProfileData };
+    expect(raw.data.aiSettings.apiKeySaved).toBe(false);
+    expect(raw.data.appSettings.lastBackupAt).toBe(exportedAt);
     const restored = restoreBackup(json);
     expect(restored.error).toBeUndefined();
     expect(restored.data?.categories).toHaveLength(data.categories.length);
     expect(restored.data?.aiSettings.apiKeySaved).toBe(false);
+    expect(restored.exportedAt).toBe(exportedAt);
+    expect(restored.summary).toEqual(summarizeProfileData(restored.data!));
+    expect(restored.summary?.expenses).toBe(1);
+  });
+
+  it("uses the verified export timestamp as the restored backup date", () => {
+    const data = createDefaultProfileData();
+    const profile: ProfileMeta = {
+      id: "profile_test",
+      displayName: "Test",
+      color: "#4466d4",
+      createdAt: "2026-07-07T00:00:00Z",
+      updatedAt: "2026-07-07T00:00:00Z"
+    };
+    const exportedAt = "2026-07-11T12:00:00.000Z";
+    const raw = JSON.parse(createBackup(profile, data, exportedAt)) as { data: ProfileData };
+    raw.data.appSettings.lastBackupAt = "not-a-date";
+    const restored = restoreBackup(JSON.stringify(raw));
+    expect(restored.data?.appSettings.lastBackupAt).toBe(exportedAt);
   });
 
   it("restores version 1 expenses without changing their historical totals", () => {
@@ -327,6 +418,21 @@ describe("CSV import/export and backups", () => {
     const restored = restoreBackup('{"app":"Other"}');
     expect(restored.data).toBeNull();
     expect(restored.error).toBe("This does not look like a LocalSpend backup.");
+  });
+
+  it("rejects structurally damaged backups instead of dropping records", () => {
+    const data = createDefaultProfileData();
+    data.expenses = [makeExpense(data.categories[0].id, "2026-02-30", 6.5, "Lunch")];
+    const profile: ProfileMeta = {
+      id: "profile_test",
+      displayName: "Test",
+      color: "#4466d4",
+      createdAt: "2026-07-07T00:00:00Z",
+      updatedAt: "2026-07-07T00:00:00Z"
+    };
+    const restored = restoreBackup(createBackup(profile, data, "2026-07-11T12:00:00.000Z"));
+    expect(restored.data).toBeNull();
+    expect(restored.error).toBe("This backup contains invalid or duplicate expense records.");
   });
 
   it("resets spending data without clearing user settings", () => {

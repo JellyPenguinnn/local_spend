@@ -25,7 +25,9 @@ profiles/<profile-id>/localspend.sqlite
 
 The active profile id controls which database file is opened. Switching profiles reloads from a different SQLite file, so records are not shared across profiles.
 
-In the hosted PWA, each browser installation keeps its own profile data in IndexedDB under the LocalSpend site origin. Earlier localStorage profile payloads migrate locally into IndexedDB; no migration data is sent to a server. Deleting the PWA or clearing Safari website data can still remove this local copy, so JSON backups remain important.
+In the hosted PWA, each browser installation keeps its own profile data in IndexedDB under the LocalSpend site origin. Earlier localStorage profile payloads migrate locally into IndexedDB; no migration data is sent to a server. The PWA requests persistent browser storage after user saves when supported, but deleting the PWA or clearing Safari website data can still remove the local copy, so JSON backups remain important.
+
+Complete JSON backups are generated locally and include the active profile's entries, bills, budgets, categories, payment methods, currencies, and appearance. API keys are never included. Restore and reset download a safety copy before destructive changes. CSV files contain expenses only and are sanitized to reduce spreadsheet formula-injection risk.
 
 ## Wallpapers
 
