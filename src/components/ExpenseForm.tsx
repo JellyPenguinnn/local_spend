@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, Check, RefreshCw, RotateCcw } from "lucide-react";
+import { CalendarDays, Check, MessageSquarePlus, RefreshCw, RotateCcw } from "lucide-react";
 import { hasDuplicateExpense, suggestFromExpenseHistory } from "../lib/analytics";
 import { suggestCategoryLocal } from "../lib/categories";
 import { fetchReferenceRate, latestCachedRate, latestKnownRate, normalizeCurrencyCode } from "../lib/currencies";
@@ -72,6 +72,7 @@ export function ExpenseForm({
   const [error, setError] = useState("");
   const [didSave, setDidSave] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isRemarkOpen, setIsRemarkOpen] = useState(Boolean(editingExpense?.remark || initialDraft?.remark));
   const [categoryNeedsReview, setCategoryNeedsReview] = useState(initialCategoryNeedsReview);
   const [rateState, setRateState] = useState<{ rate: number; date: string; source: ExchangeRateSource } | null>(null);
   const [rateStatus, setRateStatus] = useState<"idle" | "loading" | "ready" | "unavailable">("idle");
@@ -108,8 +109,13 @@ export function ExpenseForm({
       });
       setRateStatus("ready");
       setIsBaseAmountManual(editingExpense.exchangeRateSource === "manual");
+      setIsRemarkOpen(Boolean(editingExpense.remark || persisted?.remark));
     }
   }, [defaultPaymentMethod, draftStorageKey, editingExpense]);
+
+  useEffect(() => {
+    if (draft.remark) setIsRemarkOpen(true);
+  }, [draft.remark]);
 
   useEffect(() => {
     if (!editingExpense) {
@@ -311,7 +317,7 @@ export function ExpenseForm({
         <div className="form-title-row">
           <div>
             <h3>{editingExpense ? "Edit expense" : "Add expense"}</h3>
-            {duplicate && <p className="form-note warning">This looks similar to an existing expense.</p>}
+            {duplicate && <p className="form-note warning">The same amount and description are already recorded for this date.</p>}
           </div>
           {editingExpense && (
             <button className="icon-button" type="button" onClick={onCancelEdit} aria-label="Cancel editing" title="Cancel editing">
@@ -320,7 +326,7 @@ export function ExpenseForm({
           )}
         </div>
       )}
-      {hideTitleRow && duplicate && <p className="form-note warning">This looks similar to an existing expense.</p>}
+      {hideTitleRow && duplicate && <p className="form-note warning">The same amount and description are already recorded for this date.</p>}
       <div className="expense-grid">
         <div className="amount-field">
           <span className="amount-field-label">Amount</span>
@@ -336,6 +342,8 @@ export function ExpenseForm({
               ref={amountInputRef}
               aria-label="Amount"
               autoFocus={autoFocusAmount && !editingExpense}
+              autoComplete="off"
+              enterKeyHint="next"
               inputMode="decimal"
               value={draft.amount}
               placeholder="0.00"
@@ -401,7 +409,7 @@ export function ExpenseForm({
         </label>
         <label className="span-2">
           <span>Description</span>
-          <input value={draft.title} placeholder="Lunch, NTUC, Grab..." onChange={(event) => update("title", event.target.value)} />
+          <input autoComplete="off" enterKeyHint="next" value={draft.title} placeholder="Lunch, NTUC, Grab..." onChange={(event) => update("title", event.target.value)} />
         </label>
         {shouldShowSmartSuggestion && (
           <button
@@ -422,16 +430,23 @@ export function ExpenseForm({
             </strong>
           </button>
         )}
-        <label className="span-2">
-          <span>Remark</span>
-          <input value={draft.remark} placeholder="Optional note" onChange={(event) => update("remark", event.target.value)} />
-        </label>
+        {isRemarkOpen ? (
+          <label className="span-2">
+            <span>Remark</span>
+            <input autoComplete="off" enterKeyHint="done" value={draft.remark} placeholder="Optional note" onChange={(event) => update("remark", event.target.value)} />
+          </label>
+        ) : (
+          <button className="optional-field-toggle span-2" type="button" onClick={() => setIsRemarkOpen(true)}>
+            <MessageSquarePlus size={16} />
+            Add remark
+          </button>
+        )}
       </div>
       {error && <p className="form-note danger" role="alert">{error}</p>}
       <p className="sr-only" aria-live="polite">{didSave ? "Expense saved." : isSaving ? "Saving expense." : ""}</p>
       <button className={didSave ? "primary-button save-button saved" : "primary-button save-button"} type="submit" disabled={didSave || isSaving}>
         <Check size={17} />
-        {didSave ? "Saved" : isSaving ? "Saving…" : saveLabel ?? (editingExpense ? "Save changes" : "Save expense")}
+        {didSave ? "Saved" : isSaving ? "Saving…" : duplicate && !editingExpense ? "Save anyway" : saveLabel ?? (editingExpense ? "Save changes" : "Save expense")}
       </button>
     </form>
   );

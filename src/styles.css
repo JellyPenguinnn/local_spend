@@ -1027,6 +1027,23 @@ h3 {
   box-shadow: var(--inner-glow), 0 7px 18px rgba(36, 34, 28, 0.045);
 }
 
+.optional-field-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.45rem;
+  min-height: 42px;
+  padding: 0.45rem 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.optional-field-toggle:hover {
+  color: var(--accent);
+}
+
 .danger-icon {
   color: var(--danger);
 }
@@ -3528,6 +3545,11 @@ h3 {
     font-size: 0.7rem;
   }
 
+  .icon-button {
+    width: 40px;
+    height: 40px;
+  }
+
   .nav-list button.active {
     background:
       linear-gradient(180deg, color-mix(in srgb, #ffffff 50%, transparent), transparent),
@@ -3974,8 +3996,8 @@ h3 {
   }
 
   .compact-expense-list .icon-button {
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
     box-shadow: none;
   }
 

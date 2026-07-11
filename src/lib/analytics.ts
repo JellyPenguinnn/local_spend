@@ -23,6 +23,7 @@ export interface MonthlySummary {
   dailyTotals: Record<string, number>;
   previousMonthTotal: number | null;
   monthOverMonthDelta: number | null;
+  comparisonMode: "same-period" | "full-month";
   deterministicComments: string[];
 }
 
@@ -106,9 +107,15 @@ export function getCategoryTotals(expenses: Expense[], categories: Category[]): 
     .sort((a, b) => b.total - a.total);
 }
 
-export function summarizeMonth(expenses: Expense[], categories: Category[], month: string, currency = "SGD"): MonthlySummary {
+export function summarizeMonth(expenses: Expense[], categories: Category[], month: string, currency = "SGD", today = formatLocalIsoDate()): MonthlySummary {
   const current = expensesForMonth(expenses, month);
-  const previous = expensesForMonth(expenses, previousMonthKey(month));
+  const previousMonth = previousMonthKey(month);
+  const isCurrentMonth = month === today.slice(0, 7);
+  const comparisonMode = isCurrentMonth ? "same-period" : "full-month";
+  const previousMonthParts = getMonthParts(previousMonth);
+  const comparisonDay = Math.min(Number(today.slice(8, 10)), daysInMonth(previousMonthParts.year, previousMonthParts.monthIndex));
+  const previous = expensesForMonth(expenses, previousMonth).filter((expense) => !isCurrentMonth || Number(expense.date.slice(8, 10)) <= comparisonDay);
+  const currentComparison = current.filter((expense) => !isCurrentMonth || expense.date <= today);
   const dailyTotals = getDailyTotals(current);
   const categoryTotals = getCategoryTotals(current, categories);
   const total = roundMoney(current.reduce((sum, expense) => sum + expenseBaseAmount(expense), 0));
@@ -117,7 +124,8 @@ export function summarizeMonth(expenses: Expense[], categories: Category[], mont
     .map(([date, dayTotal]) => ({ date, total: dayTotal }))
     .sort((a, b) => b.total - a.total)[0] ?? null;
   const averagePerDay = roundMoney(total / Math.max(1, new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate()));
-  const monthOverMonthDelta = previousMonthTotal === null ? null : roundMoney(total - previousMonthTotal);
+  const currentComparisonTotal = roundMoney(currentComparison.reduce((sum, expense) => sum + expenseBaseAmount(expense), 0));
+  const monthOverMonthDelta = previousMonthTotal === null ? null : roundMoney(currentComparisonTotal - previousMonthTotal);
 
   const summary: MonthlySummary = {
     month,
@@ -129,6 +137,7 @@ export function summarizeMonth(expenses: Expense[], categories: Category[], mont
     dailyTotals,
     previousMonthTotal,
     monthOverMonthDelta,
+    comparisonMode,
     deterministicComments: []
   };
   summary.deterministicComments = buildDeterministicComments(summary, currency);
@@ -150,12 +159,13 @@ export function buildDeterministicComments(summary: MonthlySummary, currency = "
     comments.push(`Your highest spending day was ${summary.highestDay.date}.`);
   }
   if (summary.monthOverMonthDelta !== null) {
+    const comparison = summary.comparisonMode === "same-period" ? "the same period last month" : "the previous month";
     if (summary.monthOverMonthDelta < 0) {
-      comments.push(`You spent less than last month by ${currency} ${Math.abs(summary.monthOverMonthDelta).toFixed(2)}.`);
+      comments.push(`You spent ${currency} ${Math.abs(summary.monthOverMonthDelta).toFixed(2)} less than ${comparison}.`);
     } else if (summary.monthOverMonthDelta > 0) {
-      comments.push(`You spent more than last month by ${currency} ${summary.monthOverMonthDelta.toFixed(2)}.`);
+      comments.push(`You spent ${currency} ${summary.monthOverMonthDelta.toFixed(2)} more than ${comparison}.`);
     } else {
-      comments.push("Your spending matched last month exactly.");
+      comments.push(`Your spending matched ${comparison} exactly.`);
     }
   }
   return comments.slice(0, 4);

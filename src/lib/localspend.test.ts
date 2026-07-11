@@ -35,6 +35,7 @@ describe("money formatting and parsing", () => {
   it("rounds, parses, and formats SGD amounts", () => {
     expect(roundMoney(1.005)).toBe(1.01);
     expect(parseMoney("SGD 12.30")).toBe(12.3);
+    expect(parseMoney(".50")).toBe(0.5);
     expect(parseMoney("-2")).toBeNull();
     expect(formatMoney(6.5, "SGD")).toContain("SGD");
     expect(formatMoney(6.5, "SGD")).toContain("6.50");
@@ -146,11 +147,31 @@ describe("expense CRUD helpers and summaries", () => {
       makeExpense(data.categories[0].id, "2026-07-01", 10, "Kopi"),
       makeExpense(data.categories[1].id, "2026-07-02", 5, "MRT")
     ];
-    const summary = summarizeMonth(expenses, data.categories, "2026-07");
+    const summary = summarizeMonth(expenses, data.categories, "2026-07", "SGD", "2026-07-11");
     expect(summary.total).toBe(15);
     expect(summary.previousMonthTotal).toBe(30);
     expect(summary.monthOverMonthDelta).toBe(-15);
-    expect(summary.deterministicComments.some((comment) => comment.includes("less than last month"))).toBe(true);
+    expect(summary.comparisonMode).toBe("same-period");
+    expect(summary.deterministicComments.some((comment) => comment.includes("same period last month"))).toBe(true);
+  });
+
+  it("compares a current partial month with the same elapsed period", () => {
+    const data = createDefaultProfileData();
+    const expenses = [
+      makeExpense(data.categories[0].id, "2026-06-05", 30, "Earlier month"),
+      makeExpense(data.categories[0].id, "2026-06-20", 80, "Later month"),
+      makeExpense(data.categories[0].id, "2026-07-05", 20, "Current spend"),
+      makeExpense(data.categories[0].id, "2026-07-20", 90, "Future entry")
+    ];
+    const current = summarizeMonth(expenses, data.categories, "2026-07", "SGD", "2026-07-11");
+    expect(current.total).toBe(110);
+    expect(current.previousMonthTotal).toBe(30);
+    expect(current.monthOverMonthDelta).toBe(-10);
+    expect(current.comparisonMode).toBe("same-period");
+
+    const historical = summarizeMonth(expenses, data.categories, "2026-06", "SGD", "2026-07-11");
+    expect(historical.previousMonthTotal).toBeNull();
+    expect(historical.comparisonMode).toBe("full-month");
   });
 
   it("aggregates foreign expenses using their stable base-currency value", () => {

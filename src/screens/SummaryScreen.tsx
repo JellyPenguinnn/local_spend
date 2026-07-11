@@ -89,7 +89,7 @@ export function SummaryScreen({ data, saveData }: SummaryScreenProps) {
         <section className="hero-panel app-metric-hero summary-hero category-detail-hero">
           <button className="secondary-button back-button" type="button" onClick={() => setDrilldownCategoryId(null)}>
             <ArrowLeft size={17} />
-            Summary
+            Back
           </button>
           <div>
             <p className="eyebrow">Category</p>
@@ -142,7 +142,7 @@ export function SummaryScreen({ data, saveData }: SummaryScreenProps) {
           {summary.monthOverMonthDelta !== null && (
             <span className={summary.monthOverMonthDelta > 0 ? "month-comparison up" : summary.monthOverMonthDelta < 0 ? "month-comparison down" : "month-comparison flat"}>
               {summary.monthOverMonthDelta > 0 ? <ArrowUpRight size={15} /> : summary.monthOverMonthDelta < 0 ? <ArrowDownRight size={15} /> : <ArrowRight size={15} />}
-              {summary.monthOverMonthDelta === 0 ? "Same as last month" : `${formatMoney(Math.abs(summary.monthOverMonthDelta), data.appSettings.currency)} ${summary.monthOverMonthDelta < 0 ? "less" : "more"} than last month`}
+              {formatMonthComparison(summary.monthOverMonthDelta, summary.comparisonMode, data.appSettings.currency)}
             </span>
           )}
         </div>
@@ -219,4 +219,11 @@ export function SummaryScreen({ data, saveData }: SummaryScreenProps) {
       </div>
     </div>
   );
+}
+
+function formatMonthComparison(delta: number, mode: "same-period" | "full-month", currency: string): string {
+  if (delta === 0) return mode === "same-period" ? "Unchanged from this point last month" : "Same as previous month";
+  const direction = delta < 0 ? "less" : "more";
+  const comparison = mode === "same-period" ? "than this point last month" : "than previous month";
+  return `${formatMoney(Math.abs(delta), currency)} ${direction} ${comparison}`;
 }

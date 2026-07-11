@@ -28,10 +28,15 @@ describe("TodayScreen entry flow", () => {
     expect(screen.getByRole("group", { name: "Amount and currency" })).toContainElement(screen.getByLabelText("Spending currency"));
     expect(screen.getByRole("group", { name: "Amount and currency" })).toContainElement(screen.getByLabelText("Amount"));
     expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("kopi 2.20 yakun paynow")).toBeInTheDocument();
+    expect(screen.getByLabelText("Or enter naturally")).toHaveAttribute("placeholder", "kopi 2.20 yakun paynow");
     expect(screen.getByRole("button", { name: "Fill" })).toBeInTheDocument();
     expect(screen.getByLabelText("Category")).toHaveValue("cat_food_drinks");
     expect(screen.getByLabelText("Payment")).toHaveValue("PayNow");
+    expect(screen.getByRole("button", { name: "Add remark" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Remark")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add remark" }));
+    expect(screen.getByLabelText("Remark")).toBeInTheDocument();
   });
 
   it("defaults to Food & Drinks and the most-used payment method", () => {
@@ -272,5 +277,46 @@ describe("TodayScreen entry flow", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
     fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Grab" } });
     expect(screen.getByRole("button", { name: "Matched previous entry Transport · PayNow" })).toBeInTheDocument();
+  });
+
+  it("makes an exact duplicate deliberate without blocking legitimate repeats", () => {
+    const data = createDefaultProfileData();
+    const today = formatLocalIsoDate();
+    data.expenses = [
+      {
+        id: "exp_same",
+        amount: 2.2,
+        currency: "SGD",
+        baseAmount: 2.2,
+        baseCurrency: "SGD",
+        exchangeRate: 1,
+        exchangeRateDate: today,
+        exchangeRateSource: "base",
+        date: today,
+        categoryId: "cat_food_drinks",
+        title: "Yakun",
+        remark: null,
+        paymentMethod: "PayNow",
+        createdAt: `${today}T08:00:00.000Z`,
+        updatedAt: `${today}T08:00:00.000Z`
+      }
+    ];
+    render(
+      <TodayScreen
+        profileId="profile_duplicate"
+        data={data}
+        saveData={vi.fn().mockResolvedValue(true)}
+        upsertExpense={vi.fn().mockResolvedValue(true)}
+        deleteExpense={vi.fn().mockResolvedValue(true)}
+        secrets={{ getSecret: vi.fn().mockResolvedValue(null) }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "2.20" } });
+    fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Yakun" } });
+
+    expect(screen.getByText("The same amount and description are already recorded for this date.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save anyway" })).toBeInTheDocument();
   });
 });

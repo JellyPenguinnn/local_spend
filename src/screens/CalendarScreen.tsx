@@ -129,7 +129,7 @@ export function CalendarScreen({ profileId, data, upsertExpense, deleteExpense, 
         <section className="hero-panel selected-day-hero">
           <button className="secondary-button back-button" type="button" onClick={closeSelectedDay}>
             <ArrowLeft size={16} />
-            Calendar
+            Back
           </button>
           <div>
             <p className="eyebrow">Selected day</p>
@@ -208,7 +208,7 @@ export function CalendarScreen({ profileId, data, upsertExpense, deleteExpense, 
             </>
           )}
           {!isAdding && !editingExpense && selectedExpenses.length === 0 ? (
-            <EmptyState title="No entries for this day" body="Use Add spend above only if you spent on this date." />
+            <EmptyState title="No entries for this day" body="Tap Add only if you spent on this date." />
           ) : !isAdding && !editingExpense && selectedExpenses.length > 0 ? (
             <ExpenseList
               compact

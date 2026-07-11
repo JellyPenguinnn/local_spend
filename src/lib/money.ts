@@ -3,7 +3,7 @@ export function roundMoney(value: number): number {
 }
 
 export function parseMoney(value: string): number | null {
-  const normalized = value.trim().replace(/^[A-Za-z]{3}\s*/u, "").replace(/[$,\s]/g, "");
+  const normalized = value.trim().replace(/^[A-Za-z]{3}\s*/u, "").replace(/[$,\s]/g, "").replace(/^\./, "0.");
   if (!/^\d+(\.\d{0,2})?$/.test(normalized)) {
     return null;
   }

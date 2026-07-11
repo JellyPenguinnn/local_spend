@@ -108,3 +108,12 @@ Researched on 2026-07-10.
 - The ECB publishes working-day reference rates for both MYR and SGD and notes that reference rates are informational, not necessarily the rate used for an actual card or cash transaction: https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html
 - Frankfurter provides a browser-safe, no-key API over central-bank data, supports historical dates, and allows an ECB-only provider filter: https://frankfurter.dev/ and https://frankfurter.dev/providers/ecb/
 - LocalSpend therefore stores one transaction with two values: original amount/currency and a dated base-currency snapshot. Summaries and budgets use the snapshot; details and exports preserve the amount paid. A user can override the reference conversion to match a bank statement or cash exchange rate.
+
+## Final Daily-Use Audit
+
+Researched on 2026-07-11.
+
+- Apple recommends using interruptive alerts sparingly and reserving confirmation for actions where data loss is meaningful. LocalSpend keeps inline confirmations for permanent deletion while using quiet, contextual feedback for ordinary form guidance: https://developer.apple.com/design/human-interface-guidelines/alerts
+- Actual Budget's category learning applies prior payee behavior to reduce repeated categorization work while leaving the user in control. LocalSpend follows the smaller local-first version of this pattern by surfacing active-profile merchant matches inside the expense form: https://actualbudget.org/docs/transactions/payees/ and https://actualbudget.org/docs/budgeting/rules/
+- Actual's duplicate reconciliation checks amount, nearby dates, and payees before import. LocalSpend's manual-entry guard is intentionally narrower and clearer: an exact same-date, amount, currency, and description match is labelled before the user deliberately chooses `Save anyway`: https://actualbudget.org/docs/api/reference/
+- Current-month comparisons should not compare a partial month with an entire previous month. LocalSpend now compares current spending through today with the same elapsed period in the previous month; completed historical months continue to use full-month comparisons.
