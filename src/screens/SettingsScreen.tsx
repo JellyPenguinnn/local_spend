@@ -627,18 +627,14 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
                 </div>
               )}
               {data.appSettings.enabledCurrencies.length < CURRENCY_OPTIONS.length && (
-                <label className="currency-add-control">
-                  <Plus size={16} />
-                  <span>Add currency</span>
-                  <select value="" onChange={(event) => void addSpendingCurrency(event.target.value)} aria-label="Add spending currency">
-                    <option value="">Add currency</option>
-                    {CURRENCY_OPTIONS.filter((option) => !data.appSettings.enabledCurrencies.includes(option.code)).map((currency) => (
-                      <option key={currency.code} value={currency.code}>
-                        {currency.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <select className="currency-add-select" value="" onChange={(event) => void addSpendingCurrency(event.target.value)} aria-label="Add spending currency">
+                  <option value="">Add another currency</option>
+                  {CURRENCY_OPTIONS.filter((option) => !data.appSettings.enabledCurrencies.includes(option.code)).map((currency) => (
+                    <option key={currency.code} value={currency.code}>
+                      {currency.label}
+                    </option>
+                  ))}
+                </select>
               )}
             </div>
           </section>
