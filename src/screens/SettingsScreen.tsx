@@ -608,7 +608,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
               </select>
             </label>
             <p className="settings-help" id="main-currency-help">
-              Totals and budgets use this currency{isBaseCurrencyLocked ? ". Locked after your first record." : "."}
+              Used for totals and budgets{isBaseCurrencyLocked ? "; locked after first record." : "."}
             </p>
             <div className="enabled-currency-field">
               <div className="currency-field-head">
