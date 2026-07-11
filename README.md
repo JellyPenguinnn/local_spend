@@ -160,6 +160,8 @@ profiles/
 
 Each expense stores its original amount/currency and a dated base-currency value. The original value remains visible in transaction details, while Calendar, Summary, category distribution, and budgets use the stable base value. Historical expenses are not revalued later.
 
+Recurring bills also keep their own spending currency. When a foreign-currency bill is recorded, LocalSpend saves the dated conversion used for that occurrence so later summaries remain stable.
+
 ## Data Controls
 
 LocalSpend includes profile-scoped data controls in Settings:

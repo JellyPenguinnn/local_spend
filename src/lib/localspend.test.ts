@@ -5,7 +5,7 @@ import { suggestCategoryLocal } from "./categories";
 import { exportExpensesCsv, importExpensesCsv } from "./csv";
 import { resetSpendingData } from "./dataControls";
 import { buildCalendarMonth, formatLocalIsoDate, previousMonthKey } from "./date";
-import { fetchReferenceRate, normalizeEnabledCurrencies } from "./currencies";
+import { fetchReferenceRate, latestCachedRate, normalizeEnabledCurrencies } from "./currencies";
 import { createDefaultProfileData, normalizeAccentPalette, normalizeRecurringRules } from "./defaults";
 import { parseExpenseLocal } from "./ai/localParser";
 import { parseExpenseWithAiOrLocal } from "./ai/providers";
@@ -526,10 +526,44 @@ describe("currency settings and reference rates", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0][0])).toContain("/MYR/SGD");
     expect(String(fetchMock.mock.calls[0][0])).not.toContain("expense");
+    expect(latestCachedRate("MYR", "SGD", "2026-07-10")).toMatchObject({ rate: 0.317, date: "2026-07-03", source: "cached" });
   });
 });
 
 describe("recurring rules", () => {
+  it("records a foreign-currency bill with a stable reporting snapshot", () => {
+    const data = createDefaultProfileData();
+    const rule = makeRecurringRule({ amount: 100, currency: "MYR" });
+    const result = recordRecurringOccurrence(
+      { ...data, recurringRules: [rule] },
+      rule.id,
+      "2026-07-05",
+      "2026-07-07",
+      { rate: 0.317, date: "2026-07-03", source: "ecb-reference" }
+    );
+
+    expect(result.created).toMatchObject({
+      amount: 100,
+      currency: "MYR",
+      baseAmount: 31.7,
+      baseCurrency: "SGD",
+      exchangeRate: 0.317,
+      exchangeRateDate: "2026-07-03",
+      exchangeRateSource: "ecb-reference"
+    });
+    expect(result.data.recurringRules[0].nextDate).toBe("2026-08-05");
+  });
+
+  it("does not silently record a foreign bill without a conversion", () => {
+    const data = createDefaultProfileData();
+    const rule = makeRecurringRule({ amount: 100, currency: "MYR" });
+    const result = recordRecurringOccurrence({ ...data, recurringRules: [rule] }, rule.id, "2026-07-05", "2026-07-07");
+
+    expect(result.created).toBeNull();
+    expect(result.data.expenses).toHaveLength(0);
+    expect(result.data.recurringRules[0].nextDate).toBe("2026-07-05");
+  });
+
   it("materializes due recurring rules and advances the next date", () => {
     const data = createDefaultProfileData();
     const rule = {

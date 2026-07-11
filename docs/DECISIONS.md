@@ -43,3 +43,5 @@ Discarding is persistent during normal use so the reminder stays gone. Any delib
 Each expense remains one record. It stores the original amount/currency plus a base amount, base currency, exchange rate, rate date, and source captured at save time. Calendar totals, summaries, category distribution, and budgets use the base amount; transaction details preserve and foreground the original amount.
 
 Historical expenses are never revalued when reference rates change. Foreign entries try a dated ECB reference through Frankfurter, fall back to a locally cached or previously saved rate, and always allow a manual converted amount. The profile base currency is locked after spending, budgets, or recurring rules exist so reporting currencies cannot be mixed silently.
+
+Recurring rules store their original amount and currency. A confirmed foreign-currency occurrence obtains a dated reference rate and materializes as the same stable original/base snapshot used by manual expenses. If neither a dated nor prior cached rate is available offline, recording waits instead of silently treating the foreign amount as base currency.

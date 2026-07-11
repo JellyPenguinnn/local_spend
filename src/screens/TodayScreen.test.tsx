@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDefaultProfileData } from "../lib/defaults";
+import { formatLocalIsoDate } from "../lib/date";
 import { TodayScreen } from "./TodayScreen";
 
 afterEach(() => {
@@ -22,6 +23,9 @@ describe("TodayScreen entry flow", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     expect(screen.getByLabelText("Amount")).toHaveFocus();
+    expect(screen.getByRole("group", { name: "Amount and currency" })).toContainElement(screen.getByLabelText("Spending currency"));
+    expect(screen.getByRole("group", { name: "Amount and currency" })).toContainElement(screen.getByLabelText("Amount"));
+    expect(screen.getByRole("button", { name: "Back to entries" })).toBeInTheDocument();
     expect(screen.getByPlaceholderText("kopi 2.20 yakun paynow")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Fill" })).toBeInTheDocument();
     expect(screen.getByLabelText("Category")).toHaveValue("cat_food_drinks");
@@ -130,6 +134,56 @@ describe("TodayScreen entry flow", () => {
       amount: 18,
       currency: "MYR",
       baseAmount: 5.71,
+      baseCurrency: "SGD",
+      exchangeRateSource: "ecb-reference"
+    });
+  });
+
+  it("records a foreign-currency bill with a dated SGD snapshot", async () => {
+    localStorage.clear();
+    const today = formatLocalIsoDate();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ date: today, base: "MYR", quote: "SGD", rate: 0.317 }) })
+    );
+    const data = createDefaultProfileData();
+    data.recurringRules = [
+      {
+        id: "rule_myr",
+        title: "Mobile plan",
+        amount: 50,
+        currency: "MYR",
+        categoryId: "cat_bills",
+        remark: null,
+        paymentMethod: "Credit Card",
+        cadence: "monthly",
+        dayOfMonth: Number(today.slice(8, 10)),
+        startDate: today,
+        nextDate: today,
+        discardedDates: [],
+        isActive: true,
+        createdAt: `${today}T00:00:00.000Z`,
+        updatedAt: `${today}T00:00:00.000Z`
+      }
+    ];
+    const saveData = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <TodayScreen
+        data={data}
+        saveData={saveData}
+        upsertExpense={vi.fn().mockResolvedValue(undefined)}
+        deleteExpense={vi.fn().mockResolvedValue(undefined)}
+        secrets={{ getSecret: vi.fn().mockResolvedValue(null) }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Record" }));
+    await waitFor(() => expect(saveData).toHaveBeenCalledTimes(1));
+    expect(saveData.mock.calls[0][0].expenses[0]).toMatchObject({
+      amount: 50,
+      currency: "MYR",
+      baseAmount: 15.85,
       baseCurrency: "SGD",
       exchangeRateSource: "ecb-reference"
     });

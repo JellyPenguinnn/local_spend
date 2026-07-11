@@ -44,6 +44,8 @@ When AI is enabled:
 
 Selecting a foreign spending currency may request a dated reference rate from Frankfurter with the ECB provider selected. The request contains only the two ISO currency codes and transaction date; it does not include the amount, description, category, payment method, profile, or any spending history.
 
+The same minimal lookup applies when the user records a foreign-currency recurring bill.
+
 Returned rates are cached locally. If the service is unavailable, LocalSpend uses a suitable previously saved rate when available or asks for the base-currency equivalent manually. Manual conversion remains fully usable without the rate service.
 
 ## Secrets

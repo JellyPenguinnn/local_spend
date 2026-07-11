@@ -849,42 +849,68 @@ h3 {
   grid-column: span 2;
 }
 
-.amount-field input {
-  min-height: 70px;
-  font-size: 2.35rem;
-  font-weight: 800;
-  background: linear-gradient(180deg, var(--surface), color-mix(in srgb, var(--surface-2) 68%, var(--surface)));
-}
-
-.amount-label-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.7rem;
+.amount-field-label {
+  display: block;
   margin-bottom: 0.35rem;
-}
-
-.amount-label-row,
-.amount-label-row > span {
-  margin-bottom: 0;
-}
-
-.amount-label-row > span {
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 700;
 }
 
-.currency-select {
-  width: auto;
-  min-width: 76px;
-  min-height: 30px;
-  padding: 0.28rem 1.7rem 0.28rem 0.55rem;
-  border-color: color-mix(in srgb, var(--accent) 20%, var(--border));
-  background-color: var(--surface);
+.money-input-control {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--surface), color-mix(in srgb, var(--surface-2) 68%, var(--surface)));
+  box-shadow: var(--inner-glow);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+.money-input-control:focus-within {
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow:
+    var(--inner-glow),
+    0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent),
+    0 10px 24px color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
+.money-input-control .currency-select {
+  width: 100%;
+  min-width: 0;
+  min-height: 70px;
+  border: 0;
+  border-right: 1px solid var(--hairline);
+  border-radius: 0;
+  padding: 0.4rem 1.6rem 0.4rem 0.7rem;
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
   color: var(--text);
-  font-size: 0.8rem;
+  font-size: 0.84rem;
   font-weight: 820;
+  box-shadow: none;
+}
+
+.money-input-control > input {
+  min-height: 70px;
+  border: 0;
+  border-radius: 0;
+  padding-left: 0.78rem;
+  background: transparent;
+  font-size: 2.35rem;
+  font-weight: 800;
+  box-shadow: none;
+}
+
+.money-input-control .currency-select:focus,
+.money-input-control > input:focus {
+  background: transparent;
+  box-shadow: none;
 }
 
 .currency-conversion {
@@ -1006,9 +1032,28 @@ h3 {
   font-weight: 700;
 }
 
-.entry-top-cancel {
-  width: 100%;
-  margin-bottom: 0.75rem;
+.form-back-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  min-height: 36px;
+  margin: -0.15rem 0 0.65rem;
+  border: 0;
+  padding: 0.3rem 0.12rem;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.82rem;
+  font-weight: 780;
+}
+
+.form-back-action:hover {
+  color: var(--text);
+}
+
+.form-back-action:focus-visible {
+  border-radius: 6px;
+  outline: 2px solid color-mix(in srgb, var(--accent) 48%, transparent);
+  outline-offset: 2px;
 }
 
 .form-note {
@@ -2113,6 +2158,32 @@ h3 {
   font-size: 0.76rem;
 }
 
+.setting-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.setting-label-row > span {
+  margin: 0;
+}
+
+.setting-lock-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.base-currency-field select:disabled {
+  appearance: none;
+  opacity: 0.76;
+  cursor: default;
+}
+
 .enabled-currency-field {
   display: grid;
   gap: 0.48rem;
@@ -2853,9 +2924,32 @@ h3 {
   margin-bottom: 0;
 }
 
-.bill-top-cancel,
 .bill-save-button {
   width: 100%;
+}
+
+.bill-amount-field {
+  min-width: 0;
+}
+
+.bill-money-input {
+  grid-template-columns: 82px minmax(0, 1fr);
+}
+
+.bill-money-input .currency-select,
+.bill-money-input > input {
+  min-height: 46px;
+  font-size: 1rem;
+}
+
+.bill-money-input > input {
+  font-weight: 500;
+}
+
+.due-rate-error {
+  color: var(--warning) !important;
+  font-size: 0.72rem !important;
+  line-height: 1.3;
 }
 
 .settings-form-actions {
@@ -3389,16 +3483,30 @@ h3 {
     font-size: 1rem;
   }
 
-  .amount-field input {
+  .money-input-control,
+  .money-input-control .currency-select,
+  .money-input-control > input {
     min-height: 60px;
+  }
+
+  .money-input-control > input {
     font-size: 2rem;
   }
 
-  .entry-panel .currency-select,
-  .day-panel .currency-select {
-    width: auto;
-    min-height: 34px;
-    font-size: 0.8rem;
+  .bill-money-input,
+  .bill-money-input .currency-select,
+  .bill-money-input > input {
+    min-height: 46px;
+  }
+
+  .bill-money-input > input {
+    font-size: 1rem;
+  }
+
+  .entry-panel .money-input-control .currency-select,
+  .day-panel .money-input-control .currency-select {
+    min-height: 60px;
+    font-size: 0.82rem;
   }
 
   .currency-conversion {

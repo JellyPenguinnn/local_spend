@@ -12,7 +12,9 @@ import { EmptyState } from "../components/EmptyState";
 import { ExpenseForm } from "../components/ExpenseForm";
 import { ExpenseList } from "../components/ExpenseList";
 import { CategoryChip } from "../components/CategoryChip";
+import { FormBackAction } from "../components/FormBackAction";
 import { NaturalQuickAdd } from "../components/NaturalQuickAdd";
+import { fetchReferenceRate, latestCachedRate, latestKnownRate, normalizeCurrencyCode } from "../lib/currencies";
 
 interface TodayScreenProps {
   data: ProfileData;
@@ -39,6 +41,8 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
   const [isParsing, setIsParsing] = useState(false);
   const [isEntryOpen, setIsEntryOpen] = useState(false);
   const [pendingDiscardOccurrenceId, setPendingDiscardOccurrenceId] = useState<string | null>(null);
+  const [recordingOccurrenceId, setRecordingOccurrenceId] = useState<string | null>(null);
+  const [billRecordError, setBillRecordError] = useState<{ occurrenceId: string; message: string } | null>(null);
   const todayExpenses = useMemo(
     () => data.expenses.filter((expense) => expense.date === today).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [data.expenses, today]
@@ -80,14 +84,34 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
   }
 
   async function recordBill(ruleId: string, occurrenceDate: string) {
-    const result = recordRecurringOccurrence(data, ruleId, occurrenceDate, today);
-    await saveData(result.data);
-    setPendingDiscardOccurrenceId(null);
+    const occurrenceId = `${ruleId}:${occurrenceDate}`;
+    const rule = data.recurringRules.find((item) => item.id === ruleId);
+    if (!rule) return;
+    setRecordingOccurrenceId(occurrenceId);
+    setBillRecordError(null);
+    try {
+      const isForeignCurrency = normalizeCurrencyCode(rule.currency) !== normalizeCurrencyCode(data.appSettings.currency);
+      const conversion = isForeignCurrency
+        ? await fetchReferenceRate(rule.currency, data.appSettings.currency, occurrenceDate).catch(
+            () => latestCachedRate(rule.currency, data.appSettings.currency, occurrenceDate) ?? latestKnownRate(data.expenses, rule.currency, data.appSettings.currency, occurrenceDate)
+          )
+        : null;
+      if (isForeignCurrency && !conversion) {
+        setBillRecordError({ occurrenceId, message: `Could not convert ${rule.currency} while offline. Try again when connected.` });
+        return;
+      }
+      const result = recordRecurringOccurrence(data, ruleId, occurrenceDate, today, conversion);
+      await saveData(result.data);
+      setPendingDiscardOccurrenceId(null);
+    } finally {
+      setRecordingOccurrenceId(null);
+    }
   }
 
   async function discardBill(ruleId: string, occurrenceDate: string) {
     await saveData(discardRecurringOccurrence(data, ruleId, occurrenceDate, today));
     setPendingDiscardOccurrenceId(null);
+    setBillRecordError(null);
   }
 
   function openEntry(expense?: Expense) {
@@ -131,6 +155,7 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
               const item = occurrence.rule;
               const category = data.categories.find((entry) => entry.id === item.categoryId);
               const isDiscarding = pendingDiscardOccurrenceId === occurrence.id;
+              const isRecording = recordingOccurrenceId === occurrence.id;
               return (
                 <article className="upcoming-row due-occurrence-row" key={occurrence.id}>
                   <CategoryChip category={category} label="" compact />
@@ -140,6 +165,7 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
                       {category?.name ?? "Category"} · {item.paymentMethod || "Payment"} · {CADENCE_LABELS[item.cadence]}
                     </span>
                     <span>Due {formatDateLabel(occurrence.date)}</span>
+                    {billRecordError?.occurrenceId === occurrence.id && <span className="due-rate-error">{billRecordError.message}</span>}
                   </div>
                   <strong>{formatMoney(item.amount, item.currency || data.appSettings.currency)}</strong>
                   <div className="due-occurrence-actions">
@@ -157,8 +183,8 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
                         <button className="secondary-button" type="button" onClick={() => setPendingDiscardOccurrenceId(occurrence.id)}>
                           Discard
                         </button>
-                        <button className="primary-button" type="button" onClick={() => void recordBill(item.id, occurrence.date)}>
-                          Record
+                        <button className="primary-button" type="button" disabled={isRecording} onClick={() => void recordBill(item.id, occurrence.date)}>
+                          {isRecording ? "Recording…" : "Record"}
                         </button>
                       </>
                     )}
@@ -173,9 +199,7 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
       <div className={isEntryOpen || editingExpense ? "screen-grid today-grid entry-open" : "screen-grid today-grid entries-first"}>
         {(isEntryOpen || editingExpense) && (
         <section className="panel entry-panel">
-          <button className="secondary-button entry-top-cancel" type="button" onClick={closeEntry}>
-            Cancel
-          </button>
+          <FormBackAction label="Back to entries" onClick={closeEntry} />
           <ExpenseForm
             categories={data.categories}
             settings={data.appSettings}

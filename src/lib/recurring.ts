@@ -1,5 +1,7 @@
 import { addDays, addMonthsClamped, compareIsoDates } from "./date";
+import { normalizeCurrencyCode, type ExchangeRateQuote } from "./currencies";
 import { createId, nowIso } from "./defaults";
+import { roundMoney } from "./money";
 import type { Expense, ProfileData, RecurringRule } from "./types";
 
 const MAX_OCCURRENCES = 10_000;
@@ -65,7 +67,8 @@ export function recordRecurringOccurrence(
   data: ProfileData,
   ruleId: string,
   occurrenceDate: string,
-  today: string
+  today: string,
+  conversion?: ExchangeRateQuote | null
 ): { data: ProfileData; created: Expense | null } {
   const rule = data.recurringRules.find((item) => item.id === ruleId);
   if (!rule || !rule.isActive || compareIsoDates(occurrenceDate, today) > 0 || !isScheduledOccurrence(rule, occurrenceDate)) {
@@ -73,18 +76,25 @@ export function recordRecurringOccurrence(
   }
 
   const alreadyRecorded = hasRecordedRecurringExpense(data.expenses, rule, occurrenceDate);
+  const baseCurrency = normalizeCurrencyCode(data.appSettings.currency);
+  const ruleCurrency = normalizeCurrencyCode(rule.currency, baseCurrency);
+  const isForeignCurrency = ruleCurrency !== baseCurrency;
+  if (!alreadyRecorded && isForeignCurrency && (!conversion || !Number.isFinite(conversion.rate) || conversion.rate <= 0)) {
+    return { data, created: null };
+  }
+  const exchangeRate = isForeignCurrency ? (conversion?.rate ?? 1) : 1;
   const timestamp = nowIso();
   const created: Expense | null = alreadyRecorded
     ? null
     : {
         id: createId("exp"),
         amount: rule.amount,
-        currency: rule.currency,
-        baseAmount: rule.amount,
-        baseCurrency: data.appSettings.currency,
-        exchangeRate: 1,
-        exchangeRateDate: occurrenceDate,
-        exchangeRateSource: "base",
+        currency: ruleCurrency,
+        baseAmount: roundMoney(rule.amount * exchangeRate),
+        baseCurrency,
+        exchangeRate,
+        exchangeRateDate: isForeignCurrency ? (conversion?.date ?? occurrenceDate) : occurrenceDate,
+        exchangeRateSource: isForeignCurrency ? (conversion?.source ?? "cached") : "base",
         date: occurrenceDate,
         categoryId: rule.categoryId,
         title: rule.title,

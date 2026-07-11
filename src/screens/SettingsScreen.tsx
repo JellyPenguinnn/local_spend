@@ -1,6 +1,7 @@
 import { type ChangeEvent, type CSSProperties, useState } from "react";
-import { CalendarDays, Check, Download, Pencil, Plus, RotateCcw, Trash2, Upload, X } from "lucide-react";
+import { CalendarDays, Check, Download, LockKeyhole, Pencil, Plus, RotateCcw, Trash2, Upload, X } from "lucide-react";
 import { CategoryChip } from "../components/CategoryChip";
+import { FormBackAction } from "../components/FormBackAction";
 import { createBackup, restoreBackup } from "../lib/backup";
 import { canDeleteCategory } from "../lib/categories";
 import { CURRENCY_OPTIONS, normalizeEnabledCurrencies } from "../lib/currencies";
@@ -108,9 +109,11 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
   const accentPalette = normalizeAccentPalette(data.appSettings.accentPalette);
   const currentAccent = data.appSettings.accentColor.toLowerCase();
   const isAccentSaved = accentPalette.includes(currentAccent);
+  const defaultBillCategoryId = data.categories.find((category) => category.name.toLowerCase() === "bills")?.id ?? data.categories[0]?.id ?? "";
   const [recurringDraft, setRecurringDraft] = useState<{
     title: string;
     amount: string;
+    currency: string;
     categoryId: string;
     paymentMethod: string;
     cadence: RecurringCadence;
@@ -118,7 +121,8 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
   }>({
     title: "",
     amount: "",
-    categoryId: data.categories[0]?.id ?? "",
+    currency: data.appSettings.currency,
+    categoryId: defaultBillCategoryId,
     paymentMethod: data.appSettings.paymentMethods[0] ?? "Other",
     cadence: "monthly",
     startDate: formatLocalIsoDate()
@@ -127,6 +131,9 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
   const editingRule = editingRuleId ? (data.recurringRules.find((rule) => rule.id === editingRuleId) ?? null) : null;
   const recurringDraftTitle = recurringDraft.title.trim();
   const recurringDraftAmount = parseMoney(recurringDraft.amount);
+  const billCurrencyChoices = data.appSettings.enabledCurrencies.includes(recurringDraft.currency)
+    ? data.appSettings.enabledCurrencies
+    : [...data.appSettings.enabledCurrencies, recurringDraft.currency];
   const recurringScheduleChanged =
     !editingRule || editingRule.startDate !== recurringDraft.startDate || editingRule.cadence !== recurringDraft.cadence;
   const recurringDraftStartRulePreview: RecurringRule | null =
@@ -135,7 +142,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
           id: editingRule?.id ?? "rule_preview",
           title: recurringDraftTitle,
           amount: recurringDraftAmount,
-          currency: data.appSettings.currency,
+          currency: recurringDraft.currency,
           categoryId: recurringDraft.categoryId,
           paymentMethod: recurringDraft.paymentMethod,
           remark: null,
@@ -159,6 +166,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
   const recurringDraftAdvanceCutoff =
     recurringDraftSaveRulePreview && compareIsoDates(recurringDraftSaveRulePreview.nextDate, today) <= 0 ? today : recurringDraftSaveRulePreview?.nextDate;
   const recurringDraftAlreadyRecorded = recurringDraftStartRulePreview ? hasRecordedRecurringExpense(data.expenses, recurringDraftStartRulePreview) : false;
+  const isBaseCurrencyLocked = data.expenses.length > 0 || data.budgets.length > 0 || data.recurringRules.length > 0;
   const recurringDraftNextUnrecordedDate =
     recurringDraftSaveRulePreview && recurringDraftAdvanceCutoff
       ? (recurringScheduleChanged
@@ -179,10 +187,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
 
   async function changeBaseCurrency(currency: string) {
     if (currency === data.appSettings.currency) return;
-    if (data.expenses.length > 0 || data.budgets.length > 0 || data.recurringRules.length > 0) {
-      setStatus("Base currency is locked after spending, budgets, or bills are recorded. Add another spending currency instead.");
-      return;
-    }
+    if (isBaseCurrencyLocked) return;
     await updateSettings({
       currency,
       enabledCurrencies: normalizeEnabledCurrencies(data.appSettings.enabledCurrencies, currency)
@@ -450,7 +455,8 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
     setRecurringDraft({
       title: "",
       amount: "",
-      categoryId: data.categories[0]?.id ?? "",
+      currency: data.appSettings.currency,
+      categoryId: defaultBillCategoryId,
       paymentMethod: data.appSettings.paymentMethods[0] ?? "Other",
       cadence: "monthly",
       startDate: formatLocalIsoDate()
@@ -470,6 +476,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
     setRecurringDraft({
       title: rule.title,
       amount: String(rule.amount),
+      currency: rule.currency,
       categoryId: rule.categoryId,
       paymentMethod: rule.paymentMethod ?? data.appSettings.paymentMethods[0] ?? "Other",
       cadence: rule.cadence,
@@ -499,7 +506,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
       id: existingRule?.id ?? createId("rule"),
       title: recurringDraft.title.trim(),
       amount,
-      currency: data.appSettings.currency,
+      currency: recurringDraft.currency,
       categoryId: recurringDraft.categoryId,
       paymentMethod: recurringDraft.paymentMethod,
       remark: null,
@@ -551,9 +558,23 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
       {activeSection === "appearance" && (
         <div className="appearance-blocks">
           <section className="panel settings-panel appearance-block">
-            <label>
-              <span>Base currency</span>
-              <select value={data.appSettings.currency} onChange={(event) => void changeBaseCurrency(event.target.value)}>
+            <label className="base-currency-field">
+              <span className="setting-label-row">
+                <span>Main currency</span>
+                {isBaseCurrencyLocked && (
+                  <span className="setting-lock-state">
+                    <LockKeyhole size={12} />
+                    Fixed
+                  </span>
+                )}
+              </span>
+              <select
+                value={data.appSettings.currency}
+                disabled={isBaseCurrencyLocked}
+                aria-label="Main currency"
+                aria-describedby="main-currency-help"
+                onChange={(event) => void changeBaseCurrency(event.target.value)}
+              >
                 {CURRENCY_OPTIONS.map((currency) => (
                   <option key={currency.code} value={currency.code}>
                     {currency.label}
@@ -561,7 +582,11 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
                 ))}
               </select>
             </label>
-            <p className="settings-help">Used for calendar totals, summaries, and budgets.</p>
+            <p className="settings-help" id="main-currency-help">
+              {isBaseCurrencyLocked
+                ? "Fixed to keep existing totals accurate. Add another spending currency below."
+                : "Used for calendar totals, summaries, and budgets."}
+            </p>
             <div className="enabled-currency-field">
               <span>Spending currencies</span>
               <div className="currency-chip-row">
@@ -841,23 +866,36 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
             </div>
           ) : (
             <div className="settings-subpanel settings-inline-form bill-inline-form">
-              <button className="secondary-button bill-top-cancel" type="button" onClick={closeBillForm}>
-                Cancel
-              </button>
+              <FormBackAction label="Back to bills" onClick={closeBillForm} />
               <div className="filter-grid">
                 <label>
                   <span>Description</span>
                   <input value={recurringDraft.title} onChange={(event) => setRecurringDraft({ ...recurringDraft, title: event.target.value })} />
                 </label>
-                <label>
-                  <span>Amount ({data.appSettings.currency})</span>
-                  <input
-                    inputMode="decimal"
-                    value={recurringDraft.amount}
-                    placeholder={`${data.appSettings.currency} 0.00`}
-                    onChange={(event) => setRecurringDraft({ ...recurringDraft, amount: event.target.value })}
-                  />
-                </label>
+                <div className="bill-amount-field">
+                  <span className="amount-field-label">Amount</span>
+                  <div className="money-input-control bill-money-input" role="group" aria-label="Bill amount and currency">
+                    <select
+                      className="currency-select"
+                      value={recurringDraft.currency}
+                      onChange={(event) => setRecurringDraft({ ...recurringDraft, currency: event.target.value })}
+                      aria-label="Bill currency"
+                    >
+                      {billCurrencyChoices.map((currency) => (
+                        <option key={currency} value={currency}>
+                          {currency}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      inputMode="decimal"
+                      value={recurringDraft.amount}
+                      placeholder="0.00"
+                      aria-label="Bill amount"
+                      onChange={(event) => setRecurringDraft({ ...recurringDraft, amount: event.target.value })}
+                    />
+                  </div>
+                </div>
                 <label>
                   <span>Category</span>
                   <select value={recurringDraft.categoryId} onChange={(event) => setRecurringDraft({ ...recurringDraft, categoryId: event.target.value })}>

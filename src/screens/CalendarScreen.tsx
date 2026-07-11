@@ -10,6 +10,7 @@ import type { Expense, ExpenseDraft, ProfileData } from "../lib/types";
 import { EmptyState } from "../components/EmptyState";
 import { ExpenseForm } from "../components/ExpenseForm";
 import { ExpenseList } from "../components/ExpenseList";
+import { FormBackAction } from "../components/FormBackAction";
 import { MonthPicker } from "../components/MonthPicker";
 import { NaturalQuickAdd } from "../components/NaturalQuickAdd";
 
@@ -106,19 +107,7 @@ export function CalendarScreen({ data, upsertExpense, deleteExpense, secrets }: 
             <p className="eyebrow">Selected day</p>
             <h2>{selectedDateLabel}</h2>
           </div>
-          {isAdding || editingExpense ? (
-            <button
-              className="secondary-button day-hero-action"
-              type="button"
-              onClick={() => {
-                setIsAdding(false);
-                setEditingExpense(null);
-                clearDraft();
-              }}
-            >
-              Cancel
-            </button>
-          ) : (
+          {!isAdding && !editingExpense && (
             <button
               className="primary-button day-hero-action"
               type="button"
@@ -142,6 +131,14 @@ export function CalendarScreen({ data, upsertExpense, deleteExpense, secrets }: 
           )}
           {(isAdding || editingExpense) && (
             <>
+              <FormBackAction
+                label="Back to day"
+                onClick={() => {
+                  setEditingExpense(null);
+                  setIsAdding(false);
+                  clearDraft();
+                }}
+              />
               <ExpenseForm
                 compact
                 categories={data.categories}

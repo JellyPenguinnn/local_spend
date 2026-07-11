@@ -123,6 +123,28 @@ export function latestKnownRate(expenses: Expense[], fromCurrency: string, toCur
     : null;
 }
 
+export function latestCachedRate(fromCurrency: string, toCurrency: string, onOrBeforeDate: string): ExchangeRateQuote | null {
+  const from = normalizeCurrencyCode(fromCurrency);
+  const to = normalizeCurrencyCode(toCurrency);
+  const prefix = `${from}:${to}:`;
+  const match = Object.entries(readRateCache())
+    .flatMap(([key, quote]) => {
+      if (!key.startsWith(prefix) || !Number.isFinite(quote.rate) || quote.rate <= 0 || typeof quote.date !== "string") return [];
+      const requestedDate = key.slice(prefix.length);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate) || requestedDate > onOrBeforeDate) return [];
+      return [{ requestedDate, quote }];
+    })
+    .sort((a, b) => b.requestedDate.localeCompare(a.requestedDate))[0];
+
+  return match
+    ? {
+        rate: match.quote.rate,
+        date: match.quote.date,
+        source: "cached"
+      }
+    : null;
+}
+
 export async function fetchReferenceRate(fromCurrency: string, toCurrency: string, date: string): Promise<ExchangeRateQuote> {
   const from = normalizeCurrencyCode(fromCurrency);
   const to = normalizeCurrencyCode(toCurrency);

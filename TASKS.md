@@ -62,6 +62,7 @@
 - Added unit tests for core local logic.
 - Verified lint, TypeScript/web build, JS tests, Rust SQLite tests, and Tauri `.app` build.
 - Added stable mixed-currency expenses: original and base values, dated reference/manual conversion, SGD/MYR quick selection, base-safe analytics and budgets, SQLite/browser migrations, dual-value details, and lossless CSV/JSON portability.
+- Added currency-aware recurring bills and cleaner form navigation: bills use enabled spending currencies, foreign occurrences save dated conversion snapshots, and Today/Calendar/Bills forms use compact destination-labelled back actions above a single bottom Save action.
 
 ## Follow-Up Polish
 

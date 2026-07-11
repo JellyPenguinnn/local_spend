@@ -2,7 +2,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, Check, RefreshCw, RotateCcw } from "lucide-react";
 import { hasDuplicateExpense, suggestFromExpenseHistory } from "../lib/analytics";
 import { suggestCategoryLocal } from "../lib/categories";
-import { fetchReferenceRate, latestKnownRate, normalizeCurrencyCode } from "../lib/currencies";
+import { fetchReferenceRate, latestCachedRate, latestKnownRate, normalizeCurrencyCode } from "../lib/currencies";
 import { parseLocalDate } from "../lib/date";
 import { createId, nowIso } from "../lib/defaults";
 import { parseMoney, roundMoney } from "../lib/money";
@@ -139,7 +139,7 @@ export function ExpenseForm({
     setRateStatus("loading");
     setIsBaseAmountManual(false);
     void fetchReferenceRate(draft.currency, settings.currency, draft.date)
-      .catch(() => latestKnownRate(expenses, draft.currency, settings.currency, draft.date))
+      .catch(() => latestCachedRate(draft.currency, settings.currency, draft.date) ?? latestKnownRate(expenses, draft.currency, settings.currency, draft.date))
       .then((quote) => {
         if (cancelled) return;
         if (!quote) {
@@ -293,8 +293,8 @@ export function ExpenseForm({
       {hideTitleRow && duplicate && <p className="form-note warning">This looks similar to an existing expense.</p>}
       <div className="expense-grid">
         <div className="amount-field">
-          <div className="amount-label-row">
-            <span>Amount</span>
+          <span className="amount-field-label">Amount</span>
+          <div className="money-input-control" role="group" aria-label="Amount and currency">
             <select className="currency-select" value={draft.currency} onChange={(event) => updateCurrency(event.target.value)} aria-label="Spending currency">
               {currencyChoices.map((currency) => (
                 <option key={currency} value={currency}>
@@ -302,16 +302,16 @@ export function ExpenseForm({
                 </option>
               ))}
             </select>
+            <input
+              ref={amountInputRef}
+              aria-label="Amount"
+              autoFocus={autoFocusAmount && !editingExpense}
+              inputMode="decimal"
+              value={draft.amount}
+              placeholder="0.00"
+              onChange={(event) => updateAmount(event.target.value)}
+            />
           </div>
-          <input
-            ref={amountInputRef}
-            aria-label="Amount"
-            autoFocus={autoFocusAmount && !editingExpense}
-            inputMode="decimal"
-            value={draft.amount}
-            placeholder="0.00"
-            onChange={(event) => updateAmount(event.target.value)}
-          />
         </div>
         {isForeignCurrency && (
           <div className="currency-conversion span-2">
