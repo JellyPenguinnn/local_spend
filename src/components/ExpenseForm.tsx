@@ -171,7 +171,7 @@ export function ExpenseForm({
     let cancelled = false;
     setRateStatus("loading");
     setIsBaseAmountManual(false);
-    void fetchReferenceRate(draft.currency, settings.currency, draft.date)
+    void fetchReferenceRate(draft.currency, settings.currency, draft.date, { forceRefresh: rateRefreshNonce > 0 })
       .catch(() => latestCachedRate(draft.currency, settings.currency, draft.date) ?? latestKnownRate(expenses, draft.currency, settings.currency, draft.date))
       .then((quote) => {
         if (cancelled) return;
@@ -358,7 +358,7 @@ export function ExpenseForm({
               <input inputMode="decimal" value={draft.baseAmount} placeholder="0.00" onChange={(event) => updateBaseAmount(event.target.value)} />
             </label>
             <div className="currency-rate-note">
-              <span>{formatRateNote(rateStatus, rateState, draft.currency, settings.currency, isBaseAmountManual)}</span>
+              <span>{formatRateNote(rateStatus, rateState, draft.currency, settings.currency, draft.date, isBaseAmountManual)}</span>
               <button
                 className="icon-button currency-rate-refresh"
                 type="button"
@@ -462,14 +462,19 @@ function formatRateNote(
   rate: { rate: number; date: string; source: ExchangeRateSource } | null,
   fromCurrency: string,
   toCurrency: string,
+  requestedDate: string,
   isManual: boolean
 ): string {
   if (isManual) return "Using your converted amount";
-  if (status === "loading") return "Finding the dated reference rate...";
+  if (status === "loading") return "Updating reference rate...";
   if (!rate || status === "unavailable") return "Reference unavailable. Enter the converted amount.";
-  const source = rate.source === "cached" ? "Saved reference" : rate.source === "ecb-reference" ? "ECB reference" : "Reference rate";
   const date = /^\d{4}-\d{2}-\d{2}$/.test(rate.date)
     ? new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short" }).format(parseLocalDate(rate.date))
     : rate.date;
+  const source = rate.source === "cached"
+    ? "Saved offline rate"
+    : rate.date < requestedDate
+      ? "Latest reference"
+      : "Reference rate";
   return `1 ${fromCurrency} = ${rate.rate.toFixed(4)} ${toCurrency} · ${source}, ${date}`;
 }

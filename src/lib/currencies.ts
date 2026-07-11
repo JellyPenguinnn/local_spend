@@ -1,4 +1,5 @@
 import { roundMoney } from "./money";
+import { formatLocalIsoDate } from "./date";
 import type { ExchangeRateSource, Expense } from "./types";
 
 export interface CurrencyOption {
@@ -31,6 +32,18 @@ export const CURRENCY_OPTIONS: CurrencyOption[] = [
 ];
 
 const RATE_CACHE_KEY = "localspend.exchange-rates.v1";
+const CURRENT_RATE_CACHE_TTL_MS = 30 * 60 * 1000;
+
+interface CachedExchangeRate {
+  rate: number;
+  date: string;
+  source?: ExchangeRateQuote["source"];
+  fetchedAt?: string;
+}
+
+interface FetchReferenceRateOptions {
+  forceRefresh?: boolean;
+}
 
 export function normalizeCurrencyCode(value: unknown, fallback = "SGD"): string {
   if (typeof value !== "string") return fallback;
@@ -145,14 +158,25 @@ export function latestCachedRate(fromCurrency: string, toCurrency: string, onOrB
     : null;
 }
 
-export async function fetchReferenceRate(fromCurrency: string, toCurrency: string, date: string): Promise<ExchangeRateQuote> {
+export async function fetchReferenceRate(
+  fromCurrency: string,
+  toCurrency: string,
+  date: string,
+  options: FetchReferenceRateOptions = {}
+): Promise<ExchangeRateQuote> {
   const from = normalizeCurrencyCode(fromCurrency);
   const to = normalizeCurrencyCode(toCurrency);
   if (from === to) return { rate: 1, date, source: "base" };
 
   const cacheKey = `${from}:${to}:${date}`;
   const cached = readRateCache()[cacheKey];
-  if (cached && cached.rate > 0) return { ...cached, source: "cached" };
+  if (!options.forceRefresh && isReusableCachedRate(cached, date)) {
+    return {
+      rate: cached.rate,
+      date: cached.date,
+      source: normalizeCachedSource(cached.source)
+    };
+  }
 
   let quote: ExchangeRateQuote;
   try {
@@ -184,7 +208,14 @@ async function requestRate(from: string, to: string, date: string, ecbOnly: bool
     throw new Error("Reference rate unavailable.");
   }
   const value = (await response.json()) as { date?: unknown; rate?: unknown };
-  if (typeof value.date !== "string" || typeof value.rate !== "number" || !Number.isFinite(value.rate) || value.rate <= 0) {
+  if (
+    typeof value.date !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(value.date) ||
+    value.date > date ||
+    typeof value.rate !== "number" ||
+    !Number.isFinite(value.rate) ||
+    value.rate <= 0
+  ) {
     throw new Error("Reference rate response was invalid.");
   }
   return {
@@ -196,10 +227,10 @@ async function requestRate(from: string, to: string, date: string, ecbOnly: bool
 
 class ProviderCoverageError extends Error {}
 
-function readRateCache(): Record<string, Omit<ExchangeRateQuote, "source"> & { source?: ExchangeRateQuote["source"] }> {
+function readRateCache(): Record<string, CachedExchangeRate> {
   if (typeof localStorage === "undefined") return {};
   try {
-    const parsed = JSON.parse(localStorage.getItem(RATE_CACHE_KEY) ?? "{}") as Record<string, Omit<ExchangeRateQuote, "source">>;
+    const parsed = JSON.parse(localStorage.getItem(RATE_CACHE_KEY) ?? "{}") as Record<string, CachedExchangeRate>;
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
@@ -209,9 +240,21 @@ function readRateCache(): Record<string, Omit<ExchangeRateQuote, "source"> & { s
 function writeRateCache(key: string, quote: ExchangeRateQuote): void {
   if (typeof localStorage === "undefined") return;
   const cache = readRateCache();
-  cache[key] = { rate: quote.rate, date: quote.date };
+  cache[key] = { rate: quote.rate, date: quote.date, source: quote.source, fetchedAt: new Date().toISOString() };
   const entries = Object.entries(cache).slice(-180);
   localStorage.setItem(RATE_CACHE_KEY, JSON.stringify(Object.fromEntries(entries)));
+}
+
+function isReusableCachedRate(cached: CachedExchangeRate | undefined, requestedDate: string): cached is CachedExchangeRate {
+  if (!cached || !Number.isFinite(cached.rate) || cached.rate <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(cached.date)) return false;
+  if (requestedDate < formatLocalIsoDate()) return true;
+  if (!cached.fetchedAt) return false;
+  const fetchedAt = Date.parse(cached.fetchedAt);
+  return Number.isFinite(fetchedAt) && Date.now() - fetchedAt >= 0 && Date.now() - fetchedAt < CURRENT_RATE_CACHE_TTL_MS;
+}
+
+function normalizeCachedSource(source: ExchangeRateQuote["source"] | undefined): ExchangeRateQuote["source"] {
+  return source === "ecb-reference" || source === "reference" ? source : "cached";
 }
 
 function normalizeExchangeRateSource(value: unknown, fallback: ExchangeRateSource): ExchangeRateSource {

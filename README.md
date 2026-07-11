@@ -160,6 +160,8 @@ profiles/
 
 Each expense stores its original amount/currency and a dated base-currency value. The original value remains visible in transaction details, while Calendar, Summary, category distribution, and budgets use the stable base value. Historical expenses are not revalued later.
 
+For a current-date foreign expense, LocalSpend reuses a provider quote for up to 30 minutes. The refresh control always requests the provider again. On weekends and holidays, the latest valid reference can be dated on the previous working day; offline fallback is labelled separately as a saved offline rate.
+
 Recurring bills also keep their own spending currency. When a foreign-currency bill is recorded, LocalSpend saves the dated conversion used for that occurrence so later summaries remain stable.
 
 ## Data Controls

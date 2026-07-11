@@ -50,4 +50,6 @@ Each expense remains one record. It stores the original amount/currency plus a b
 
 Historical expenses are never revalued when reference rates change. Foreign entries try a dated ECB reference through Frankfurter, fall back to a locally cached or previously saved rate, and always allow a manual converted amount. The profile base currency is locked after spending, budgets, or recurring rules exist so reporting currencies cannot be mixed silently.
 
+Current-date provider quotes use a 30-minute freshness window, and the user-triggered refresh always bypasses cache. Historical quotes can be reused because the reference for that date is immutable. A provider result dated before the requested date is presented as the latest available reference, which is expected on weekends and closing days; only a failed network request that falls back locally is labelled as a saved offline rate.
+
 Recurring rules store their original amount and currency. A confirmed foreign-currency occurrence obtains a dated reference rate and materializes as the same stable original/base snapshot used by manual expenses. If neither a dated nor prior cached rate is available offline, recording waits instead of silently treating the foreign amount as base currency.

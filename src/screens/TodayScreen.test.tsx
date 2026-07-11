@@ -114,9 +114,10 @@ describe("TodayScreen entry flow", () => {
 
   it("keeps a foreign amount while saving its SGD reporting equivalent", async () => {
     localStorage.clear();
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ date: "2026-07-10", base: "MYR", quote: "SGD", rate: 0.317 }) });
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ date: "2026-07-10", base: "MYR", quote: "SGD", rate: 0.317 }) })
+      fetchMock
     );
     const upsertExpense = vi.fn().mockResolvedValue(true);
     render(
@@ -133,6 +134,9 @@ describe("TodayScreen entry flow", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
     fireEvent.change(screen.getByLabelText("Spending currency"), { target: { value: "MYR" } });
     await screen.findByLabelText("In SGD");
+    expect(await screen.findByText(/Latest reference, 10 Jul/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh reference rate" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "18" } });
     expect(screen.getByLabelText("In SGD")).toHaveValue("5.71");
     fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Nasi lemak" } });

@@ -67,6 +67,7 @@
 - Unified the final form polish: all form navigation now says `Back`, Calendar edit no longer adds a redundant heading, and bill amount/currency uses the exact same unclipped control as Today.
 - Completed a final daily-use audit: current-month comparisons now use the same elapsed period, exact duplicates use an explicit `Save anyway` action, optional remarks are progressively disclosed to shorten entry, Back labels are consistent, natural entry has a correct accessible label, leading-decimal amounts are accepted, and mobile icon targets are larger.
 - Refined Calendar, Summary, and General settings copy: Calendar now uses the literal `Spending by day` heading, budget status leads with the amount remaining and one concise percentage line, and currency settings separate the locked reporting currency from optional removable spending currencies with a reliable native Add picker.
+- Corrected exchange-rate freshness: current quotes expire after 30 minutes, Refresh bypasses cache, historical quotes remain reusable, weekend/holiday provider dates read as `Latest reference`, and only genuine offline fallback reads as a saved offline rate.
 
 ## Follow-Up Polish
 

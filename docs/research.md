@@ -117,3 +117,11 @@ Researched on 2026-07-11.
 - Actual Budget's category learning applies prior payee behavior to reduce repeated categorization work while leaving the user in control. LocalSpend follows the smaller local-first version of this pattern by surfacing active-profile merchant matches inside the expense form: https://actualbudget.org/docs/transactions/payees/ and https://actualbudget.org/docs/budgeting/rules/
 - Actual's duplicate reconciliation checks amount, nearby dates, and payees before import. LocalSpend's manual-entry guard is intentionally narrower and clearer: an exact same-date, amount, currency, and description match is labelled before the user deliberately chooses `Save anyway`: https://actualbudget.org/docs/api/reference/
 - Current-month comparisons should not compare a partial month with an entire previous month. LocalSpend now compares current spending through today with the same elapsed period in the previous month; completed historical months continue to use full-month comparisons.
+
+## Exchange-Rate Freshness
+
+Researched on 2026-07-11.
+
+- ECB reference rates are normally published around 16:00 CET on working days, excluding TARGET closing days. A Friday quote is therefore the correct latest available reference on Saturday or Sunday: https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html
+- Frankfurter exposes the latest working-day data and historical dates over a no-key API. Its returned quote date can legitimately be earlier than the requested calendar date on weekends and holidays: https://frankfurter.dev/
+- LocalSpend now keeps current-date quotes fresh for 30 minutes, lets the refresh action bypass cache, preserves immutable historical quotes, and labels genuine offline fallback separately from the latest available provider reference.
