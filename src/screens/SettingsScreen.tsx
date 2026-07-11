@@ -1,5 +1,5 @@
 import { type ChangeEvent, type CSSProperties, useState } from "react";
-import { CalendarDays, Check, Download, LockKeyhole, Pencil, Plus, RotateCcw, Trash2, Upload, X } from "lucide-react";
+import { CalendarDays, Check, Download, Pencil, Plus, RotateCcw, Trash2, Upload, X } from "lucide-react";
 import { CategoryChip } from "../components/CategoryChip";
 import { FormBackAction } from "../components/FormBackAction";
 import { createBackup, restoreBackup } from "../lib/backup";
@@ -592,15 +592,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
         <div className="appearance-blocks">
           <section className="panel settings-panel appearance-block">
             <label className="base-currency-field">
-              <span className="setting-label-row">
-                <span>Main currency</span>
-                {isBaseCurrencyLocked && (
-                  <span className="setting-lock-state">
-                    <LockKeyhole size={12} />
-                    Fixed
-                  </span>
-                )}
-              </span>
+              <span>Main currency</span>
               <select
                 value={data.appSettings.currency}
                 disabled={isBaseCurrencyLocked}
@@ -616,33 +608,37 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
               </select>
             </label>
             <p className="settings-help" id="main-currency-help">
-              {isBaseCurrencyLocked
-                ? "Fixed to keep existing totals accurate. Add another spending currency below."
-                : "Used for calendar totals, summaries, and budgets."}
+              Totals and budgets use this currency{isBaseCurrencyLocked ? ". Locked after your first record." : "."}
             </p>
             <div className="enabled-currency-field">
-              <span>Spending currencies</span>
-              <div className="currency-chip-row">
-                {data.appSettings.enabledCurrencies.map((currency) => (
-                  <span className={currency === data.appSettings.currency ? "currency-chip base" : "currency-chip"} key={currency}>
-                    {currency}
-                    {currency !== data.appSettings.currency && (
-                      <button type="button" onClick={() => void removeSpendingCurrency(currency)} aria-label={`Remove ${currency}`} title={`Remove ${currency}`}>
-                        <X size={13} />
-                      </button>
-                    )}
-                  </span>
-                ))}
-              </div>
+              <span>Other spending currencies</span>
+              {data.appSettings.enabledCurrencies.some((currency) => currency !== data.appSettings.currency) && (
+                <div className="currency-chip-row">
+                  {data.appSettings.enabledCurrencies
+                    .filter((currency) => currency !== data.appSettings.currency)
+                    .map((currency) => (
+                      <span className="currency-chip" key={currency}>
+                        {currency}
+                        <button type="button" onClick={() => void removeSpendingCurrency(currency)} aria-label={`Remove ${currency}`} title={`Remove ${currency}`}>
+                          <X size={13} />
+                        </button>
+                      </span>
+                    ))}
+                </div>
+              )}
               {data.appSettings.enabledCurrencies.length < CURRENCY_OPTIONS.length && (
-                <select className="currency-add-select" value="" onChange={(event) => void addSpendingCurrency(event.target.value)} aria-label="Add spending currency">
-                  <option value="">Add currency...</option>
-                  {CURRENCY_OPTIONS.filter((option) => !data.appSettings.enabledCurrencies.includes(option.code)).map((currency) => (
-                    <option key={currency.code} value={currency.code}>
-                      {currency.label}
-                    </option>
-                  ))}
-                </select>
+                <label className="currency-add-control">
+                  <Plus size={16} />
+                  <span>Add currency</span>
+                  <select value="" onChange={(event) => void addSpendingCurrency(event.target.value)} aria-label="Add spending currency">
+                    <option value="">Add currency</option>
+                    {CURRENCY_OPTIONS.filter((option) => !data.appSettings.enabledCurrencies.includes(option.code)).map((currency) => (
+                      <option key={currency.code} value={currency.code}>
+                        {currency.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               )}
             </div>
           </section>

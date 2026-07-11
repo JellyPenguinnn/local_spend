@@ -241,9 +241,8 @@ export function CalendarScreen({ profileId, data, upsertExpense, deleteExpense, 
       <div className="screen-grid calendar-layout">
         <section className="panel calendar-panel">
           <div className="section-heading compact-heading">
-            <h2>Daily pattern</h2>
+            <h2>Spending by day</h2>
             <div className="calendar-heading-actions">
-              <span className="muted small">Darker days spent more</span>
               <button className="icon-button" type="button" onClick={() => setIsSearching(true)} aria-label="Search spending" title="Search spending">
                 <Search size={17} />
               </button>

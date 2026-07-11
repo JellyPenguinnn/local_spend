@@ -56,6 +56,7 @@ export function SummaryScreen({ data, saveData }: SummaryScreenProps) {
   const leftPercent = totalBudget.budget && totalBudget.budget.amount > 0
     ? Math.max(0, Math.round(((totalBudget.budget.amount - totalBudget.spent) / totalBudget.budget.amount) * 100))
     : null;
+  const budgetRemaining = totalBudget.budget ? totalBudget.budget.amount - totalBudget.spent : null;
 
   function openBudgetEditor() {
     setBudgetInput(totalBudget.budget ? totalBudget.budget.amount.toFixed(2) : "");
@@ -157,15 +158,32 @@ export function SummaryScreen({ data, saveData }: SummaryScreenProps) {
           <div className="section-heading compact-heading">
             <div>
               <p className="eyebrow">Monthly budget</p>
-              <h2>{totalBudget.budget ? formatMoney(totalBudget.budget.amount, data.appSettings.currency) : "No budget set"}</h2>
+              <h2 className={budgetRemaining !== null && budgetRemaining < 0 ? "budget-remaining-value over" : "budget-remaining-value"}>
+                {budgetRemaining === null
+                  ? "No budget set"
+                  : budgetRemaining < 0
+                    ? `${formatMoney(Math.abs(budgetRemaining), data.appSettings.currency)} over`
+                    : `${formatMoney(budgetRemaining, data.appSettings.currency)} left`}
+              </h2>
             </div>
           </div>
           <p className="muted budget-summary-line">
-            {safeToSpend.budget ? `${formatMoney(Math.max(0, safeToSpend.left), data.appSettings.currency)} left${leftPercent !== null ? ` · ${leftPercent}% left` : ""}` : "Set a monthly limit to see what is left."}
+            {safeToSpend.budget && leftPercent !== null
+              ? `${leftPercent}% remaining of ${formatMoney(safeToSpend.budget.amount, data.appSettings.currency)}`
+              : "Set a monthly limit to see what remains."}
           </p>
-          <div className="progress-track">
-            <span style={{ width: `${leftPercent ?? 0}%` }} />
-          </div>
+          {safeToSpend.budget && leftPercent !== null && (
+            <div
+              className="progress-track"
+              role="progressbar"
+              aria-label="Budget remaining"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={leftPercent}
+            >
+              <span style={{ width: `${leftPercent}%` }} />
+            </div>
+          )}
           {isBudgetEditorOpen && (
             <div className="inline-input budget-editor-row">
               <input value={budgetInput} placeholder="Monthly budget" inputMode="decimal" onChange={(event) => setBudgetInput(event.target.value)} />
