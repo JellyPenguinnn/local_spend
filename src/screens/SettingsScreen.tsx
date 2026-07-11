@@ -615,7 +615,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
                 <span>Other currencies</span>
                 {data.appSettings.enabledCurrencies.length < CURRENCY_OPTIONS.length && (
                   <select className="currency-add-select" value="" onChange={(event) => void addSpendingCurrency(event.target.value)} aria-label="Add spending currency">
-                    <option value="">Add currency</option>
+                    <option value="">Add</option>
                     {CURRENCY_OPTIONS.filter((option) => !data.appSettings.enabledCurrencies.includes(option.code)).map((currency) => (
                       <option key={currency.code} value={currency.code}>
                         {currency.label}

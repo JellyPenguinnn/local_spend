@@ -2319,10 +2319,10 @@ h3 {
 }
 
 .currency-add-select {
-  width: 128px;
+  width: 88px;
   min-width: 0;
-  max-width: 48%;
-  flex: 0 0 128px;
+  max-width: 38%;
+  flex: 0 0 88px;
   min-height: 38px;
   padding: 0.48rem 2rem 0.48rem 0.68rem;
   border-color: color-mix(in srgb, var(--accent) 20%, var(--hairline));
