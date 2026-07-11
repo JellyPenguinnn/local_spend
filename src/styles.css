@@ -2269,7 +2269,14 @@ h3 {
   border-top: 1px solid var(--hairline);
 }
 
-.enabled-currency-field > span {
+.currency-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.currency-field-head > span {
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 700;
@@ -2312,10 +2319,15 @@ h3 {
 }
 
 .currency-add-select {
-  min-height: 44px;
+  width: 128px;
+  min-width: 0;
+  max-width: 48%;
+  flex: 0 0 128px;
+  min-height: 38px;
+  padding: 0.48rem 2rem 0.48rem 0.68rem;
   border-color: color-mix(in srgb, var(--accent) 20%, var(--hairline));
   background: var(--glass-strong);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 700;
 }
 

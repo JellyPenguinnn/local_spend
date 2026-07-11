@@ -611,7 +611,19 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
               Totals and budgets use this currency{isBaseCurrencyLocked ? ". Locked after your first record." : "."}
             </p>
             <div className="enabled-currency-field">
-              <span>Other spending currencies</span>
+              <div className="currency-field-head">
+                <span>Other currencies</span>
+                {data.appSettings.enabledCurrencies.length < CURRENCY_OPTIONS.length && (
+                  <select className="currency-add-select" value="" onChange={(event) => void addSpendingCurrency(event.target.value)} aria-label="Add spending currency">
+                    <option value="">Add currency</option>
+                    {CURRENCY_OPTIONS.filter((option) => !data.appSettings.enabledCurrencies.includes(option.code)).map((currency) => (
+                      <option key={currency.code} value={currency.code}>
+                        {currency.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
               {data.appSettings.enabledCurrencies.some((currency) => currency !== data.appSettings.currency) && (
                 <div className="currency-chip-row">
                   {data.appSettings.enabledCurrencies
@@ -625,16 +637,6 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
                       </span>
                     ))}
                 </div>
-              )}
-              {data.appSettings.enabledCurrencies.length < CURRENCY_OPTIONS.length && (
-                <select className="currency-add-select" value="" onChange={(event) => void addSpendingCurrency(event.target.value)} aria-label="Add spending currency">
-                  <option value="">Add another currency</option>
-                  {CURRENCY_OPTIONS.filter((option) => !data.appSettings.enabledCurrencies.includes(option.code)).map((currency) => (
-                    <option key={currency.code} value={currency.code}>
-                      {currency.label}
-                    </option>
-                  ))}
-                </select>
               )}
             </div>
           </section>
