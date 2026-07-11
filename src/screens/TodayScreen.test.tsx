@@ -25,7 +25,7 @@ describe("TodayScreen entry flow", () => {
     expect(screen.getByLabelText("Amount")).toHaveFocus();
     expect(screen.getByRole("group", { name: "Amount and currency" })).toContainElement(screen.getByLabelText("Spending currency"));
     expect(screen.getByRole("group", { name: "Amount and currency" })).toContainElement(screen.getByLabelText("Amount"));
-    expect(screen.getByRole("button", { name: "Back to entries" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
     expect(screen.getByPlaceholderText("kopi 2.20 yakun paynow")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Fill" })).toBeInTheDocument();
     expect(screen.getByLabelText("Category")).toHaveValue("cat_food_drinks");

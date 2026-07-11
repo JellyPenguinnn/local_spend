@@ -88,9 +88,8 @@ export function CalendarScreen({ data, upsertExpense, deleteExpense, secrets }: 
 
   if (selectedDate) {
     const selectedTotal = dailyTotals[selectedDate] ?? 0;
-    const selectedPanelLabel = editingExpense
-      ? "Edit spending"
-      : isAdding
+    const selectedPanelLabel =
+      isAdding || editingExpense
         ? ""
         : selectedExpenses.length === 0
           ? "No spending yet"
@@ -132,7 +131,6 @@ export function CalendarScreen({ data, upsertExpense, deleteExpense, secrets }: 
           {(isAdding || editingExpense) && (
             <>
               <FormBackAction
-                label="Back to day"
                 onClick={() => {
                   setEditingExpense(null);
                   setIsAdding(false);

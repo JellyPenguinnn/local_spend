@@ -1,15 +1,14 @@
 import { ArrowLeft } from "lucide-react";
 
 interface FormBackActionProps {
-  label: string;
   onClick: () => void;
 }
 
-export function FormBackAction({ label, onClick }: FormBackActionProps) {
+export function FormBackAction({ onClick }: FormBackActionProps) {
   return (
-    <button className="form-back-action" type="button" onClick={onClick}>
+    <button className="form-back-action" type="button" onClick={onClick} aria-label="Back">
       <ArrowLeft size={16} />
-      <span>{label}</span>
+      <span>Back</span>
     </button>
   );
 }

@@ -39,7 +39,7 @@
 - Bill `Start date` is editable and defines the schedule pattern. The app stores `Next Due` separately, advances it after recording, skips exact already-recorded bill expenses, and resolves edited past start dates forward instead of backfilling old reminders.
 - `Record bill(s)` records at most one missing due occurrence per bill rule per tap. If several months are overdue, the reminder remains due after each confirmation so the user can choose whether to catch up one occurrence at a time instead of silently bulk-creating history.
 - On narrow screens, Today prioritizes fast entry, navigation moves to the bottom, and panels stack for one-handed iPhone use.
-- Long forms use a compact destination-labelled back action at the top and one clear Save action at the bottom.
+- Long forms use one compact Back action at the top and one clear Save action at the bottom.
 
 ## AI Workflows
 

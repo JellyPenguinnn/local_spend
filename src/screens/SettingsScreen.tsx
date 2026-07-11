@@ -866,7 +866,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
             </div>
           ) : (
             <div className="settings-subpanel settings-inline-form bill-inline-form">
-              <FormBackAction label="Back to bills" onClick={closeBillForm} />
+              <FormBackAction onClick={closeBillForm} />
               <div className="filter-grid">
                 <label>
                   <span>Description</span>
@@ -874,7 +874,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
                 </label>
                 <div className="bill-amount-field">
                   <span className="amount-field-label">Amount</span>
-                  <div className="money-input-control bill-money-input" role="group" aria-label="Bill amount and currency">
+                  <div className="money-input-control" role="group" aria-label="Bill amount and currency">
                     <select
                       className="currency-select"
                       value={recurringDraft.currency}

@@ -2932,20 +2932,6 @@ h3 {
   min-width: 0;
 }
 
-.bill-money-input {
-  grid-template-columns: 82px minmax(0, 1fr);
-}
-
-.bill-money-input .currency-select,
-.bill-money-input > input {
-  min-height: 46px;
-  font-size: 1rem;
-}
-
-.bill-money-input > input {
-  font-weight: 500;
-}
-
 .due-rate-error {
   color: var(--warning) !important;
   font-size: 0.72rem !important;
@@ -3491,16 +3477,6 @@ h3 {
 
   .money-input-control > input {
     font-size: 2rem;
-  }
-
-  .bill-money-input,
-  .bill-money-input .currency-select,
-  .bill-money-input > input {
-    min-height: 46px;
-  }
-
-  .bill-money-input > input {
-    font-size: 1rem;
   }
 
   .entry-panel .money-input-control .currency-select,

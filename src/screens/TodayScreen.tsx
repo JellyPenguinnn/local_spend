@@ -199,7 +199,7 @@ export function TodayScreen({ data, saveData, upsertExpense, deleteExpense, secr
       <div className={isEntryOpen || editingExpense ? "screen-grid today-grid entry-open" : "screen-grid today-grid entries-first"}>
         {(isEntryOpen || editingExpense) && (
         <section className="panel entry-panel">
-          <FormBackAction label="Back to entries" onClick={closeEntry} />
+          <FormBackAction onClick={closeEntry} />
           <ExpenseForm
             categories={data.categories}
             settings={data.appSettings}
