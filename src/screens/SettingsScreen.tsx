@@ -1,5 +1,5 @@
 import { type ChangeEvent, type CSSProperties, useState } from "react";
-import { CalendarDays, Check, Download, Pencil, Plus, RotateCcw, Trash2, Upload, X } from "lucide-react";
+import { CalendarDays, Check, Download, Lock, Pencil, Plus, RotateCcw, Trash2, Upload, X } from "lucide-react";
 import { CategoryChip } from "../components/CategoryChip";
 import { FormBackAction } from "../components/FormBackAction";
 import { createBackup, restoreBackup } from "../lib/backup";
@@ -608,7 +608,8 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
               </select>
             </label>
             <p className="settings-help" id="main-currency-help">
-              Used for totals and budgets{isBaseCurrencyLocked ? "; locked after first record." : "."}
+              {isBaseCurrencyLocked && <Lock size={12} aria-hidden="true" />}
+              <span>Used for totals and budgets{isBaseCurrencyLocked ? "; locked after first record." : "."}</span>
             </p>
             <div className="enabled-currency-field">
               <div className="currency-field-head">

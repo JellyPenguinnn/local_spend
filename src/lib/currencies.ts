@@ -41,10 +41,6 @@ interface CachedExchangeRate {
   fetchedAt?: string;
 }
 
-interface FetchReferenceRateOptions {
-  forceRefresh?: boolean;
-}
-
 export function normalizeCurrencyCode(value: unknown, fallback = "SGD"): string {
   if (typeof value !== "string") return fallback;
   const code = value.trim().toUpperCase();
@@ -161,8 +157,7 @@ export function latestCachedRate(fromCurrency: string, toCurrency: string, onOrB
 export async function fetchReferenceRate(
   fromCurrency: string,
   toCurrency: string,
-  date: string,
-  options: FetchReferenceRateOptions = {}
+  date: string
 ): Promise<ExchangeRateQuote> {
   const from = normalizeCurrencyCode(fromCurrency);
   const to = normalizeCurrencyCode(toCurrency);
@@ -170,7 +165,7 @@ export async function fetchReferenceRate(
 
   const cacheKey = `${from}:${to}:${date}`;
   const cached = readRateCache()[cacheKey];
-  if (!options.forceRefresh && isReusableCachedRate(cached, date)) {
+  if (isReusableCachedRate(cached, date)) {
     return {
       rate: cached.rate,
       date: cached.date,

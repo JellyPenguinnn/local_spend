@@ -1,12 +1,12 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, Check, MessageSquarePlus, RefreshCw, RotateCcw } from "lucide-react";
+import { CalendarDays, Check, MessageSquarePlus, RotateCcw } from "lucide-react";
 import { hasDuplicateExpense, suggestFromExpenseHistory } from "../lib/analytics";
 import { suggestCategoryLocal } from "../lib/categories";
 import { fetchReferenceRate, latestCachedRate, latestKnownRate, normalizeCurrencyCode } from "../lib/currencies";
 import { parseLocalDate } from "../lib/date";
 import { createId, nowIso } from "../lib/defaults";
 import { clearExpenseDraft, loadExpenseDraft, saveExpenseDraft } from "../lib/drafts";
-import { parseMoney, roundMoney } from "../lib/money";
+import { formatCompactMoney, parseMoney, roundMoney } from "../lib/money";
 import { mostUsedPaymentMethod } from "../lib/payments";
 import type { AppSettings, Category, ExchangeRateSource, Expense, ExpenseDraft } from "../lib/types";
 
@@ -77,8 +77,8 @@ export function ExpenseForm({
   const [rateState, setRateState] = useState<{ rate: number; date: string; source: ExchangeRateSource } | null>(null);
   const [rateStatus, setRateStatus] = useState<"idle" | "loading" | "ready" | "unavailable">("idle");
   const [isBaseAmountManual, setIsBaseAmountManual] = useState(false);
-  const [rateRefreshNonce, setRateRefreshNonce] = useState(0);
   const amount = typeof draft.amount === "number" ? draft.amount : parseMoney(String(draft.amount));
+  const convertedAmount = typeof draft.baseAmount === "number" ? draft.baseAmount : parseMoney(String(draft.baseAmount));
   const isForeignCurrency = normalizeCurrencyCode(draft.currency) !== normalizeCurrencyCode(settings.currency);
   const currencyChoices = settings.enabledCurrencies.includes(draft.currency) ? settings.enabledCurrencies : [...settings.enabledCurrencies, draft.currency];
   const suggestion = useMemo(() => suggestCategoryLocal(`${draft.title} ${draft.remark}`, categories), [categories, draft.remark, draft.title]);
@@ -160,7 +160,6 @@ export function ExpenseForm({
 
     if (
       editingExpense &&
-      rateRefreshNonce === 0 &&
       draft.currency === editingExpense.currency &&
       draft.date === editingExpense.date &&
       editingExpense.baseCurrency === settings.currency
@@ -171,7 +170,7 @@ export function ExpenseForm({
     let cancelled = false;
     setRateStatus("loading");
     setIsBaseAmountManual(false);
-    void fetchReferenceRate(draft.currency, settings.currency, draft.date, { forceRefresh: rateRefreshNonce > 0 })
+    void fetchReferenceRate(draft.currency, settings.currency, draft.date)
       .catch(() => latestCachedRate(draft.currency, settings.currency, draft.date) ?? latestKnownRate(expenses, draft.currency, settings.currency, draft.date))
       .then((quote) => {
         if (cancelled) return;
@@ -191,7 +190,7 @@ export function ExpenseForm({
     return () => {
       cancelled = true;
     };
-  }, [draft.currency, draft.date, editingExpense, expenses, isForeignCurrency, rateRefreshNonce, settings.currency]);
+  }, [draft.currency, draft.date, editingExpense, expenses, isForeignCurrency, settings.currency]);
 
   function update<K extends keyof ExpenseDraft>(key: K, value: ExpenseDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -211,7 +210,6 @@ export function ExpenseForm({
     setRateState(null);
     setRateStatus("idle");
     setIsBaseAmountManual(false);
-    setRateRefreshNonce(0);
     setDraft((current) => ({ ...current, currency: value, baseAmount: value === settings.currency ? current.amount : "" }));
     setError("");
   }
@@ -353,21 +351,21 @@ export function ExpenseForm({
         </div>
         {isForeignCurrency && (
           <div className="currency-conversion span-2">
-            <label>
-              <span>In {settings.currency}</span>
-              <input inputMode="decimal" value={draft.baseAmount} placeholder="0.00" onChange={(event) => updateBaseAmount(event.target.value)} />
-            </label>
+            {rateStatus === "unavailable" || isBaseAmountManual ? (
+              <label className="currency-conversion-manual">
+                <span>In {settings.currency}</span>
+                <input inputMode="decimal" value={draft.baseAmount} placeholder="0.00" onChange={(event) => updateBaseAmount(event.target.value)} />
+              </label>
+            ) : (
+              <div className="currency-conversion-value">
+                <span>In {settings.currency}</span>
+                <output className="currency-conversion-output" aria-label={`In ${settings.currency}`} aria-live="polite">
+                  {formatCompactMoney(convertedAmount ?? 0, settings.currency)}
+                </output>
+              </div>
+            )}
             <div className="currency-rate-note">
               <span>{formatRateNote(rateStatus, rateState, draft.currency, settings.currency, draft.date, isBaseAmountManual)}</span>
-              <button
-                className="icon-button currency-rate-refresh"
-                type="button"
-                onClick={() => setRateRefreshNonce((value) => value + 1)}
-                aria-label="Refresh reference rate"
-                title="Refresh reference rate"
-              >
-                <RefreshCw size={15} />
-              </button>
             </div>
           </div>
         )}

@@ -133,12 +133,13 @@ describe("TodayScreen entry flow", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
     fireEvent.change(screen.getByLabelText("Spending currency"), { target: { value: "MYR" } });
-    await screen.findByLabelText("In SGD");
+    const convertedAmount = await screen.findByLabelText("In SGD");
     expect(await screen.findByText(/Latest reference, 10 Jul/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Refresh reference rate" }));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "Refresh reference rate" })).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "18" } });
-    expect(screen.getByLabelText("In SGD")).toHaveValue("5.71");
+    expect(convertedAmount.tagName).toBe("OUTPUT");
+    expect(convertedAmount).toHaveTextContent("SGD 5.71");
     fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Nasi lemak" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
@@ -149,6 +150,41 @@ describe("TodayScreen entry flow", () => {
       baseAmount: 5.71,
       baseCurrency: "SGD",
       exchangeRateSource: "ecb-reference"
+    });
+  });
+
+  it("asks for a manual reporting amount only when no reference rate is available", async () => {
+    localStorage.clear();
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    const upsertExpense = vi.fn().mockResolvedValue(true);
+    render(
+      <TodayScreen
+        profileId="profile_test"
+        data={createDefaultProfileData()}
+        saveData={vi.fn().mockResolvedValue(true)}
+        upsertExpense={upsertExpense}
+        deleteExpense={vi.fn().mockResolvedValue(true)}
+        secrets={{ getSecret: vi.fn().mockResolvedValue(null) }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.change(screen.getByLabelText("Spending currency"), { target: { value: "MYR" } });
+    expect(await screen.findByText("Reference unavailable. Enter the converted amount.")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "18" } });
+    const manualAmount = screen.getByLabelText("In SGD");
+    expect(manualAmount.tagName).toBe("INPUT");
+    fireEvent.change(manualAmount, { target: { value: "5.80" } });
+    fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Nasi lemak" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(upsertExpense).toHaveBeenCalledTimes(1));
+    expect(upsertExpense.mock.calls[0][0]).toMatchObject({
+      amount: 18,
+      currency: "MYR",
+      baseAmount: 5.8,
+      baseCurrency: "SGD",
+      exchangeRateSource: "manual"
     });
   });
 

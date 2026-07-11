@@ -160,7 +160,7 @@ profiles/
 
 Each expense stores its original amount/currency and a dated base-currency value. The original value remains visible in transaction details, while Calendar, Summary, category distribution, and budgets use the stable base value. Historical expenses are not revalued later.
 
-For a current-date foreign expense, LocalSpend reuses a provider quote for up to 30 minutes. The refresh control always requests the provider again. On weekends and holidays, the latest valid reference can be dated on the previous working day; offline fallback is labelled separately as a saved offline rate.
+For a current-date foreign expense, LocalSpend automatically reuses a provider quote for up to 30 minutes and requests another when a later form needs a stale quote. On weekends and holidays, the latest valid reference can be dated on the previous working day; offline fallback is labelled separately as a saved offline rate.
 
 Recurring bills also keep their own spending currency. When a foreign-currency bill is recorded, LocalSpend saves the dated conversion used for that occurrence so later summaries remain stable.
 
@@ -216,7 +216,7 @@ cargo test
 - The hosted PWA uses browser storage, while the macOS Tauri app uses SQLite.
 - Native iOS App Store/TestFlight distribution is not part of v1.
 - Cloud AI provider setup is disabled in the simplified v1 UI; natural quick add uses local parsing.
-- Automatic foreign-currency conversion uses an informational reference rate and may differ from a bank, card, or cash exchange rate; the converted amount can be edited before saving.
+- Automatic foreign-currency conversion uses a read-only informational reference rate and may differ from a bank, card, or cash exchange rate; manual conversion appears only when no suitable reference is available.
 - No license file has been added yet.
 
 ## Documentation

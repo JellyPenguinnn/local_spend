@@ -124,4 +124,4 @@ Researched on 2026-07-11.
 
 - ECB reference rates are normally published around 16:00 CET on working days, excluding TARGET closing days. A Friday quote is therefore the correct latest available reference on Saturday or Sunday: https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html
 - Frankfurter exposes the latest working-day data and historical dates over a no-key API. Its returned quote date can legitimately be earlier than the requested calendar date on weekends and holidays: https://frankfurter.dev/
-- LocalSpend now keeps current-date quotes fresh for 30 minutes, lets the refresh action bypass cache, preserves immutable historical quotes, and labels genuine offline fallback separately from the latest available provider reference.
+- LocalSpend now keeps current-date quotes fresh for 30 minutes, automatically requests another when a later form needs a stale quote, preserves immutable historical quotes, and labels genuine offline fallback separately from the latest available provider reference.

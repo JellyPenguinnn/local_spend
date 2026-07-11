@@ -48,7 +48,7 @@ Selecting a foreign spending currency may request a dated reference rate from Fr
 
 The same minimal lookup applies when the user records a foreign-currency recurring bill.
 
-Returned rates are cached locally. Current-date quotes are considered fresh for 30 minutes, while the explicit refresh action bypasses cache. If the service is unavailable, LocalSpend uses a suitable previously saved rate when available and labels it as an offline rate, or asks for the base-currency equivalent manually. Manual conversion remains fully usable without the rate service.
+Returned rates are cached locally. Current-date quotes are considered fresh for 30 minutes and are requested again automatically when a later form needs a stale quote. Automatic conversions are shown as read-only reporting values. If the service is unavailable, LocalSpend uses a suitable previously saved rate when available and labels it as an offline rate, or asks for the base-currency equivalent manually so entry remains usable without the rate service.
 
 ## Secrets
 

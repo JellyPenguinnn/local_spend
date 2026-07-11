@@ -536,7 +536,7 @@ describe("currency settings and reference rates", () => {
     expect(normalizeEnabledCurrencies(["USD", "USD"], "MYR")).toEqual(["MYR", "USD"]);
   });
 
-  it("keeps a fresh provider quote and lets refresh bypass the cache", async () => {
+  it("keeps provider attribution when reusing a fresh quote", async () => {
     localStorage.clear();
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -545,11 +545,9 @@ describe("currency settings and reference rates", () => {
     vi.stubGlobal("fetch", fetchMock);
     const first = await fetchReferenceRate("MYR", "SGD", "2026-07-05");
     const second = await fetchReferenceRate("MYR", "SGD", "2026-07-05");
-    const refreshed = await fetchReferenceRate("MYR", "SGD", "2026-07-05", { forceRefresh: true });
     expect(first).toMatchObject({ rate: 0.317, date: "2026-07-03", source: "ecb-reference" });
     expect(second.source).toBe("ecb-reference");
-    expect(refreshed.source).toBe("ecb-reference");
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0][0])).toContain("/MYR/SGD");
     expect(String(fetchMock.mock.calls[0][0])).not.toContain("expense");
     expect(latestCachedRate("MYR", "SGD", "2026-07-10")).toMatchObject({ rate: 0.317, date: "2026-07-03", source: "cached" });

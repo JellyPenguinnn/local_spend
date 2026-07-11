@@ -931,15 +931,41 @@ h3 {
   background: color-mix(in srgb, var(--accent) 5%, var(--surface));
 }
 
-.currency-conversion label input {
+.currency-conversion-manual {
+  display: grid;
+  gap: 0.38rem;
+}
+
+.currency-conversion-manual input {
   min-height: 42px;
   font-weight: 750;
+}
+
+.currency-conversion-value {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.currency-conversion-value > span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.currency-conversion-output {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  color: var(--text);
+  font-size: 1.15rem;
+  font-weight: 820;
 }
 
 .currency-rate-note {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 0.45rem;
   min-width: 0;
   padding-bottom: 0.05rem;
@@ -950,11 +976,6 @@ h3 {
 .currency-rate-note > span {
   max-width: 290px;
   line-height: 1.3;
-}
-
-.currency-rate-refresh {
-  width: 34px;
-  height: 34px;
 }
 
 .span-2 {
@@ -2250,9 +2271,16 @@ h3 {
 }
 
 .settings-help {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
   margin: 0.48rem 0 0;
   color: var(--muted);
   font-size: 0.76rem;
+}
+
+.settings-help svg {
+  flex: 0 0 auto;
 }
 
 .base-currency-field select:disabled {
@@ -3748,7 +3776,7 @@ h3 {
   }
 
   .currency-rate-note {
-    justify-content: space-between;
+    justify-content: flex-start;
   }
 
   .currency-rate-note > span {
