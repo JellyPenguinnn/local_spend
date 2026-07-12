@@ -1395,6 +1395,42 @@ h3 {
   font-size: 1.03rem;
 }
 
+.due-amount-stack {
+  display: grid;
+  justify-items: end;
+  gap: 0.08rem;
+  min-width: max-content;
+  padding-top: 0.03rem;
+  text-align: right;
+}
+
+.upcoming-row .due-amount-stack > strong,
+.upcoming-row .due-amount-stack > span,
+.upcoming-row .due-amount-stack > small {
+  display: block;
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.upcoming-row .due-amount-stack > strong {
+  font-size: 1rem;
+}
+
+.upcoming-row .due-amount-stack > span {
+  margin-top: 0.05rem;
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 780;
+}
+
+.upcoming-row .due-amount-stack > small {
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 650;
+}
+
 .due-amount-mismatch {
   color: color-mix(in srgb, var(--warning) 78%, var(--text)) !important;
   white-space: normal !important;
@@ -4398,6 +4434,11 @@ h3 {
     grid-column: 2;
     color: var(--muted);
     font-size: 0.9rem;
+  }
+
+  .due-amount-stack {
+    grid-column: 2;
+    justify-self: end;
   }
 
   .due-occurrence-actions {

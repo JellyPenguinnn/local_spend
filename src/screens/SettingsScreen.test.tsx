@@ -23,6 +23,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("Settings data controls", () => {
@@ -200,6 +201,21 @@ describe("Settings organization", () => {
     expect(screen.getByText("Review")).toBeInTheDocument();
     expect(screen.getByText("Understand")).toBeInTheDocument();
     expect(screen.getByText("Your data")).toBeInTheDocument();
+  });
+
+  it("keeps recurring setup focused on the original amount and currency", () => {
+    const data = createDefaultProfileData();
+    data.appSettings.enabledCurrencies = ["SGD", "MYR"];
+    render(<SettingsScreen activeProfile={profile} data={data} repository={createRepositoryMock()} saveData={vi.fn().mockResolvedValue(true)} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Recurring" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.change(screen.getByLabelText("Bill currency"), { target: { value: "MYR" } });
+    fireEvent.change(screen.getByLabelText("Bill amount"), { target: { value: "10" } });
+
+    expect(screen.getByLabelText("Bill currency")).toHaveValue("MYR");
+    expect(screen.getByLabelText("Bill amount")).toHaveValue("10");
+    expect(screen.queryByLabelText("In SGD")).not.toBeInTheDocument();
   });
 });
 

@@ -755,6 +755,38 @@ describe("recurring rules", () => {
     expect(result.data.recurringRules[0].nextDate).toBe("2026-08-05");
   });
 
+  it("captures a fresh conversion for each recurring occurrence without revaluing history", () => {
+    const data = createDefaultProfileData();
+    const rule = makeRecurringRule({ amount: 100, currency: "MYR" });
+    const july = recordRecurringOccurrence(
+      { ...data, recurringRules: [rule] },
+      rule.id,
+      "2026-07-05",
+      "2026-07-05",
+      { rate: 0.317, date: "2026-07-04", source: "ecb-reference" }
+    );
+    const august = recordRecurringOccurrence(
+      july.data,
+      rule.id,
+      "2026-08-05",
+      "2026-08-05",
+      { rate: 0.321, date: "2026-08-05", source: "ecb-reference" }
+    );
+
+    expect(august.data.expenses).toHaveLength(2);
+    expect(august.data.expenses[0]).toMatchObject({
+      baseAmount: 31.7,
+      exchangeRate: 0.317,
+      exchangeRateDate: "2026-07-04"
+    });
+    expect(august.data.expenses[1]).toMatchObject({
+      baseAmount: 32.1,
+      exchangeRate: 0.321,
+      exchangeRateDate: "2026-08-05"
+    });
+    expect(august.data.recurringRules[0].nextDate).toBe("2026-09-05");
+  });
+
   it("does not silently record a foreign bill without a conversion", () => {
     const data = createDefaultProfileData();
     const rule = makeRecurringRule({ amount: 100, currency: "MYR" });

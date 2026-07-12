@@ -35,7 +35,7 @@
 - Summary calculates category distribution, month-over-month comparison, budget progress, and deterministic comments.
 - Summary category boxes open a monthly category detail view showing each matching spend with date, title, and amount.
 - Spending setup keeps compact category and payment-method controls together; both support progressive add flows and confirmed removal.
-- Recurring rules can use any enabled spending currency and generate due expenses after user confirmation. Foreign occurrences capture a dated base-currency conversion when recorded.
+- Recurring rules keep setup focused on the original amount and currency. When an occurrence is due, Today shows its dated reporting-currency equivalent before confirmation; every recorded foreign occurrence captures its own conversion snapshot.
 - Bill `Start date` is editable and defines the schedule pattern. The app stores `Next Due` separately, advances it after recording, skips exact already-recorded bill expenses, and resolves edited past start dates forward instead of backfilling old reminders.
 - `Record bill(s)` records at most one missing due occurrence per bill rule per tap. If several months are overdue, the reminder remains due after each confirmation so the user can choose whether to catch up one occurrence at a time instead of silently bulk-creating history.
 - On narrow screens, Today prioritizes fast entry, navigation moves to the bottom, and panels stack for one-handed iPhone use.

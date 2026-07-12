@@ -162,7 +162,7 @@ Each expense stores its original amount/currency and a dated base-currency value
 
 For a current-date foreign expense, LocalSpend automatically reuses a provider quote for up to 30 minutes and requests another when a later form needs a stale quote. On weekends and holidays, the latest valid reference can be dated on the previous working day; offline fallback is labelled separately as a saved offline rate.
 
-Recurring bills also keep their own spending currency. When a foreign-currency bill is recorded, LocalSpend saves the dated conversion used for that occurrence so later summaries remain stable.
+Recurring spending keeps setup to its original amount and currency. When it becomes due, Today shows the dated base-currency equivalent before recording; each confirmed occurrence saves that conversion so later summaries remain stable.
 
 ## Data Controls
 

@@ -4,7 +4,10 @@ import { CategoryChip } from "../components/CategoryChip";
 import { FormBackAction } from "../components/FormBackAction";
 import { MAX_BACKUP_FILE_BYTES, createBackup, restoreBackup, summarizeProfileData, type ProfileDataSummary } from "../lib/backup";
 import { canDeleteCategory } from "../lib/categories";
-import { CURRENCY_OPTIONS, normalizeEnabledCurrencies } from "../lib/currencies";
+import {
+  CURRENCY_OPTIONS,
+  normalizeEnabledCurrencies
+} from "../lib/currencies";
 import { MAX_CSV_FILE_BYTES, exportExpensesCsv, findNewImportedExpenses, importExpensesCsv } from "../lib/csv";
 import { resetSpendingData as resetProfileSpendingData } from "../lib/dataControls";
 import {

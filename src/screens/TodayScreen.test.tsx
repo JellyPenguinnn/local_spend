@@ -191,10 +191,8 @@ describe("TodayScreen entry flow", () => {
   it("records a foreign-currency bill with a dated SGD snapshot", async () => {
     localStorage.clear();
     const today = formatLocalIsoDate();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ date: today, base: "MYR", quote: "SGD", rate: 0.317 }) })
-    );
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ date: today, base: "MYR", quote: "SGD", rate: 0.317 }) });
+    vi.stubGlobal("fetch", fetchMock);
     const data = createDefaultProfileData();
     data.recurringRules = [
       {
@@ -228,6 +226,8 @@ describe("TodayScreen entry flow", () => {
       />
     );
 
+    expect(await screen.findByText("≈ SGD 15.85")).toBeInTheDocument();
+    expect(screen.getByText(/Dated rate/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Record" }));
     await waitFor(() => expect(saveData).toHaveBeenCalledTimes(1));
     expect(saveData.mock.calls[0][0].expenses[0]).toMatchObject({
@@ -237,6 +237,7 @@ describe("TodayScreen entry flow", () => {
       baseCurrency: "SGD",
       exchangeRateSource: "ecb-reference"
     });
+    expect(String(fetchMock.mock.calls[0][0])).toContain(`date=${today}`);
   });
 
   it("keeps the form and values when persistence fails", async () => {

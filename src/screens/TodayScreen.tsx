@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronDown, ChevronUp, Plus } from "lucide-react";
 import { getDailyTotals } from "../lib/analytics";
 import { fallbackCategoryId } from "../lib/categories";
 import { formatLocalIsoDate, parseLocalDate } from "../lib/date";
 import { clearExpenseDraft, expenseDraftKey } from "../lib/drafts";
-import { formatMoney } from "../lib/money";
+import { formatMoney, roundMoney } from "../lib/money";
 import { mostUsedPaymentMethod } from "../lib/payments";
 import {
   discardRecurringOccurrence,
@@ -21,7 +21,7 @@ import { ExpenseList } from "../components/ExpenseList";
 import { CategoryChip } from "../components/CategoryChip";
 import { FormBackAction } from "../components/FormBackAction";
 import { NaturalQuickAdd } from "../components/NaturalQuickAdd";
-import { fetchReferenceRate, latestCachedRate, latestKnownRate, normalizeCurrencyCode } from "../lib/currencies";
+import { normalizeCurrencyCode, resolveReferenceRate, type ExchangeRateQuote, type ExchangeRateStatus } from "../lib/currencies";
 
 interface TodayScreenProps {
   profileId: string;
@@ -39,6 +39,17 @@ const CADENCE_LABELS: Record<RecurringCadence, string> = {
   annually: "Annually"
 };
 
+interface DueRatePreview {
+  status: ExchangeRateStatus;
+  quote: ExchangeRateQuote | null;
+}
+
+function formatDueRateLabel(quote: ExchangeRateQuote, requestedDate: string): string {
+  const date = new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short" }).format(parseLocalDate(quote.date));
+  const source = quote.source === "cached" ? "Saved rate" : quote.date < requestedDate ? "Latest rate" : "Dated rate";
+  return `${source} · ${date}`;
+}
+
 export function TodayScreen({ profileId, data, saveData, upsertExpense, deleteExpense, secrets }: TodayScreenProps) {
   const today = formatLocalIsoDate();
   const todayLabel = new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short", year: "numeric" }).format(parseLocalDate(today));
@@ -52,6 +63,7 @@ export function TodayScreen({ profileId, data, saveData, upsertExpense, deleteEx
   const [pendingDiscardOccurrenceId, setPendingDiscardOccurrenceId] = useState<string | null>(null);
   const [recordingOccurrenceId, setRecordingOccurrenceId] = useState<string | null>(null);
   const [billRecordError, setBillRecordError] = useState<{ occurrenceId: string; message: string } | null>(null);
+  const [dueRatePreviews, setDueRatePreviews] = useState<Record<string, DueRatePreview>>({});
   const [showUpcoming, setShowUpcoming] = useState(false);
   const todayExpenses = useMemo(
     () => data.expenses.filter((expense) => expense.date === today).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
@@ -67,6 +79,41 @@ export function TodayScreen({ profileId, data, saveData, upsertExpense, deleteEx
     [data.expenses, data.recurringRules, today]
   );
   const activeDraftKey = expenseDraftKey(profileId, editingExpense ? `edit.${editingExpense.id}` : `today.${today}`);
+
+  useEffect(() => {
+    const foreignOccurrences = dueOccurrences.filter(
+      (occurrence) => normalizeCurrencyCode(occurrence.rule.currency) !== normalizeCurrencyCode(data.appSettings.currency)
+    );
+    const activeIds = new Set(foreignOccurrences.map((occurrence) => occurrence.id));
+    setDueRatePreviews((current) => Object.fromEntries(
+      foreignOccurrences.map((occurrence) => [occurrence.id, { status: "loading", quote: current[occurrence.id]?.quote ?? null }])
+    ));
+    if (foreignOccurrences.length === 0) return;
+
+    let cancelled = false;
+    const groups = new Map<string, { currency: string; date: string; occurrenceIds: string[] }>();
+    for (const occurrence of foreignOccurrences) {
+      const key = `${occurrence.rule.currency}:${occurrence.date}`;
+      const group = groups.get(key) ?? { currency: occurrence.rule.currency, date: occurrence.date, occurrenceIds: [] };
+      group.occurrenceIds.push(occurrence.id);
+      groups.set(key, group);
+    }
+    for (const group of groups.values()) {
+      void resolveReferenceRate(group.currency, data.appSettings.currency, group.date, data.expenses).then((quote) => {
+        if (cancelled) return;
+        setDueRatePreviews((current) => {
+          const next = { ...current };
+          for (const occurrenceId of group.occurrenceIds) {
+            if (activeIds.has(occurrenceId)) next[occurrenceId] = { status: quote ? "ready" : "unavailable", quote };
+          }
+          return next;
+        });
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [data.appSettings.currency, data.expenses, dueOccurrences]);
 
   async function parseQuickAdd() {
     if (!quickText.trim()) {
@@ -108,10 +155,14 @@ export function TodayScreen({ profileId, data, saveData, upsertExpense, deleteEx
     try {
       const isForeignCurrency = normalizeCurrencyCode(rule.currency) !== normalizeCurrencyCode(data.appSettings.currency);
       const conversion = isForeignCurrency
-        ? await fetchReferenceRate(rule.currency, data.appSettings.currency, occurrenceDate).catch(
-            () => latestCachedRate(rule.currency, data.appSettings.currency, occurrenceDate) ?? latestKnownRate(data.expenses, rule.currency, data.appSettings.currency, occurrenceDate)
-          )
+        ? await resolveReferenceRate(rule.currency, data.appSettings.currency, occurrenceDate, data.expenses)
         : null;
+      if (isForeignCurrency) {
+        setDueRatePreviews((current) => ({
+          ...current,
+          [occurrenceId]: { status: conversion ? "ready" : "unavailable", quote: conversion }
+        }));
+      }
       if (isForeignCurrency && !conversion) {
         setBillRecordError({ occurrenceId, message: `Could not convert ${rule.currency} while offline. Try again when connected.` });
         return;
@@ -185,6 +236,9 @@ export function TodayScreen({ profileId, data, saveData, upsertExpense, deleteEx
               const category = data.categories.find((entry) => entry.id === item.categoryId);
               const isDiscarding = pendingDiscardOccurrenceId === occurrence.id;
               const isRecording = recordingOccurrenceId === occurrence.id;
+              const isForeignCurrency = normalizeCurrencyCode(item.currency) !== normalizeCurrencyCode(data.appSettings.currency);
+              const ratePreview = dueRatePreviews[occurrence.id];
+              const convertedAmount = ratePreview?.quote ? roundMoney(item.amount * ratePreview.quote.rate) : null;
               return (
                 <article className="upcoming-row due-occurrence-row" key={occurrence.id}>
                   <CategoryChip category={category} label="" compact />
@@ -201,7 +255,21 @@ export function TodayScreen({ profileId, data, saveData, upsertExpense, deleteEx
                     )}
                     {billRecordError?.occurrenceId === occurrence.id && <span className="due-rate-error">{billRecordError.message}</span>}
                   </div>
-                  <strong>{formatMoney(item.amount, item.currency || data.appSettings.currency)}</strong>
+                  <div className="due-amount-stack">
+                    <strong>{formatMoney(item.amount, item.currency || data.appSettings.currency)}</strong>
+                    {isForeignCurrency && (
+                      <>
+                        <span>
+                          {convertedAmount !== null
+                            ? `≈ ${formatMoney(convertedAmount, data.appSettings.currency)}`
+                            : ratePreview?.status === "unavailable"
+                              ? "Rate unavailable"
+                              : "Updating rate…"}
+                        </span>
+                        {ratePreview?.quote && <small>{formatDueRateLabel(ratePreview.quote, occurrence.date)}</small>}
+                      </>
+                    )}
+                  </div>
                   <div className="due-occurrence-actions">
                     {isDiscarding ? (
                       <>
@@ -220,7 +288,7 @@ export function TodayScreen({ profileId, data, saveData, upsertExpense, deleteEx
                         {occurrence.relatedExpense && occurrence.relatedExpense.amount !== item.amount ? (
                           <>
                             <button className="secondary-button" type="button" disabled={isRecording} onClick={() => void recordBill(item.id, occurrence.date)}>
-                              Record expected
+                              {isRecording ? "Recording…" : "Record expected"}
                             </button>
                             <button className="primary-button" type="button" onClick={() => void reconcileRecordedBill(item.id, occurrence.date, occurrence.relatedExpense!.id)}>
                               Use recorded

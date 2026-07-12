@@ -1,5 +1,5 @@
 import { roundMoney } from "./money";
-import { formatLocalIsoDate } from "./date";
+import { formatLocalIsoDate, parseLocalDate } from "./date";
 import type { ExchangeRateSource, Expense } from "./types";
 
 export interface CurrencyOption {
@@ -12,6 +12,8 @@ export interface ExchangeRateQuote {
   date: string;
   source: Extract<ExchangeRateSource, "base" | "ecb-reference" | "reference" | "cached">;
 }
+
+export type ExchangeRateStatus = "idle" | "loading" | "ready" | "unavailable";
 
 export const CURRENCY_OPTIONS: CurrencyOption[] = [
   { code: "SGD", label: "SGD - Singapore dollar" },
@@ -182,6 +184,41 @@ export async function fetchReferenceRate(
   }
   writeRateCache(cacheKey, quote);
   return quote;
+}
+
+export async function resolveReferenceRate(
+  fromCurrency: string,
+  toCurrency: string,
+  date: string,
+  expenses: Expense[] = []
+): Promise<ExchangeRateQuote | null> {
+  try {
+    return await fetchReferenceRate(fromCurrency, toCurrency, date);
+  } catch {
+    return latestCachedRate(fromCurrency, toCurrency, date) ?? latestKnownRate(expenses, fromCurrency, toCurrency, date);
+  }
+}
+
+export function formatExchangeRateNote(
+  status: ExchangeRateStatus,
+  rate: { rate: number; date: string; source: ExchangeRateSource } | null,
+  fromCurrency: string,
+  toCurrency: string,
+  requestedDate: string,
+  options: { isManual?: boolean; unavailableMessage?: string } = {}
+): string {
+  if (options.isManual) return "Using your converted amount";
+  if (status === "loading") return "Updating reference rate...";
+  if (!rate || status === "unavailable") return options.unavailableMessage ?? "Reference unavailable. Enter the converted amount.";
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(rate.date)
+    ? new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short" }).format(parseLocalDate(rate.date))
+    : rate.date;
+  const source = rate.source === "cached"
+    ? "Saved offline rate"
+    : rate.date < requestedDate
+      ? "Latest reference"
+      : "Reference rate";
+  return `1 ${fromCurrency} = ${rate.rate.toFixed(4)} ${toCurrency} · ${source}, ${date}`;
 }
 
 async function requestRate(from: string, to: string, date: string, ecbOnly: boolean): Promise<ExchangeRateQuote> {

@@ -2,7 +2,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, Check, MessageSquarePlus, RotateCcw } from "lucide-react";
 import { hasDuplicateExpense, suggestFromExpenseHistory } from "../lib/analytics";
 import { suggestCategoryLocal } from "../lib/categories";
-import { fetchReferenceRate, latestCachedRate, latestKnownRate, normalizeCurrencyCode } from "../lib/currencies";
+import { formatExchangeRateNote, normalizeCurrencyCode, resolveReferenceRate } from "../lib/currencies";
 import { parseLocalDate } from "../lib/date";
 import { createId, nowIso } from "../lib/defaults";
 import { clearExpenseDraft, loadExpenseDraft, saveExpenseDraft } from "../lib/drafts";
@@ -178,8 +178,7 @@ export function ExpenseForm({
     let cancelled = false;
     setRateStatus("loading");
     setIsBaseAmountManual(false);
-    void fetchReferenceRate(draft.currency, settings.currency, draft.date)
-      .catch(() => latestCachedRate(draft.currency, settings.currency, draft.date) ?? latestKnownRate(expenses, draft.currency, settings.currency, draft.date))
+    void resolveReferenceRate(draft.currency, settings.currency, draft.date, expenses)
       .then((quote) => {
         if (cancelled) return;
         if (!quote) {
@@ -381,7 +380,7 @@ export function ExpenseForm({
               </div>
             )}
             <div className="currency-rate-note">
-              <span>{formatRateNote(rateStatus, rateState, draft.currency, settings.currency, draft.date, isBaseAmountManual)}</span>
+              <span>{formatExchangeRateNote(rateStatus, rateState, draft.currency, settings.currency, draft.date, { isManual: isBaseAmountManual })}</span>
             </div>
           </div>
         )}
@@ -469,26 +468,4 @@ export function ExpenseForm({
 function formatDateForField(value: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Choose date";
   return new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short", year: "numeric" }).format(parseLocalDate(value));
-}
-
-function formatRateNote(
-  status: "idle" | "loading" | "ready" | "unavailable",
-  rate: { rate: number; date: string; source: ExchangeRateSource } | null,
-  fromCurrency: string,
-  toCurrency: string,
-  requestedDate: string,
-  isManual: boolean
-): string {
-  if (isManual) return "Using your converted amount";
-  if (status === "loading") return "Updating reference rate...";
-  if (!rate || status === "unavailable") return "Reference unavailable. Enter the converted amount.";
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(rate.date)
-    ? new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short" }).format(parseLocalDate(rate.date))
-    : rate.date;
-  const source = rate.source === "cached"
-    ? "Saved offline rate"
-    : rate.date < requestedDate
-      ? "Latest reference"
-      : "Reference rate";
-  return `1 ${fromCurrency} = ${rate.rate.toFixed(4)} ${toCurrency} · ${source}, ${date}`;
 }

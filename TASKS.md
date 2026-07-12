@@ -72,6 +72,8 @@
 - Hardened local data controls: complete validated JSON backups, automatic safety backups before restore/reset, persistent browser-storage requests, file-size/date/reference checks, duplicate-safe CSV import, and spreadsheet-formula-safe CSV export.
 - Finalized the local data footprint: atomic sectioned IndexedDB migration, changed-section-only writes, same-origin-only PWA caching, compact JSON backups, and automatic stale-draft pruning.
 - Reorganized Settings into Appearance, Recurring, Spending, and General; merged categories and payment methods into compact grids; and added an optional screenshot-style quick guide beside local data controls.
+- Kept foreign-currency Recurring setup focused on amount and currency, then moved the automatic base-currency preview, dated-rate label, and confirmation to the actual due reminder on Today.
+- Added cadence-rate regression coverage so each foreign recurring occurrence saves its own latest available dated conversion without revaluing earlier months.
 
 ## Follow-Up Polish
 
