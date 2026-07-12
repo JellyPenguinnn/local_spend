@@ -1,5 +1,5 @@
 import { type ChangeEvent, type CSSProperties, useState } from "react";
-import { CalendarDays, Check, Download, Lock, Pencil, Plus, RotateCcw, Trash2, Upload, X } from "lucide-react";
+import { BookOpen, CalendarDays, Check, ChevronDown, Download, Lock, Pencil, Plus, Repeat2, RotateCcw, ShieldCheck, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
 import { CategoryChip } from "../components/CategoryChip";
 import { FormBackAction } from "../components/FormBackAction";
 import { MAX_BACKUP_FILE_BYTES, createBackup, restoreBackup, summarizeProfileData, type ProfileDataSummary } from "../lib/backup";
@@ -29,7 +29,7 @@ interface SettingsScreenProps {
   saveData: (data: ProfileData) => Promise<boolean>;
 }
 
-type SettingsSection = "appearance" | "bills" | "categories" | "payments";
+type SettingsSection = "appearance" | "recurring" | "spending" | "general";
 type PendingDelete =
   | { kind: "bill"; id: string }
   | { kind: "accent"; id: string }
@@ -38,10 +38,10 @@ type PendingDelete =
   | { kind: "wallpaper"; id: string };
 
 const SETTINGS_SECTIONS: Array<{ key: SettingsSection; label: string }> = [
-  { key: "appearance", label: "General" },
-  { key: "bills", label: "Bills" },
-  { key: "categories", label: "Categories" },
-  { key: "payments", label: "Payments" }
+  { key: "appearance", label: "Appearance" },
+  { key: "recurring", label: "Recurring" },
+  { key: "spending", label: "Spending" },
+  { key: "general", label: "General" }
 ];
 
 const CADENCE_OPTIONS: Array<{ value: RecurringCadence; label: string }> = [
@@ -140,6 +140,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
   const [isResettingData, setIsResettingData] = useState(false);
   const [isDataBusy, setIsDataBusy] = useState(false);
   const [dataStatus, setDataStatus] = useState("");
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
   const accentPalette = normalizeAccentPalette(data.appSettings.accentPalette);
   const currentAccent = data.appSettings.accentColor.toLowerCase();
   const isAccentSaved = accentPalette.includes(currentAccent);
@@ -204,6 +205,8 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
   const dataSummary = summarizeProfileData(data);
   const backupRecordCount = dataSummary.expenses + dataSummary.budgets + dataSummary.recurringRules + dataSummary.wallpapers;
   const hasResettableData = dataSummary.expenses + dataSummary.budgets + dataSummary.recurringRules > 0;
+  const pendingCategoryDelete = pendingDelete?.kind === "category" ? data.categories.find((category) => category.id === pendingDelete.id) ?? null : null;
+  const pendingPaymentDelete = pendingDelete?.kind === "payment" ? pendingDelete.id : null;
   const recurringDraftNextUnrecordedDate =
     recurringDraftSaveRulePreview && recurringDraftAdvanceCutoff
       ? (recurringScheduleChanged
@@ -919,108 +922,14 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
             </div>
             </div>
           </section>
-          <section className="panel settings-panel appearance-block data-control-card" aria-busy={isDataBusy}>
-            <div className="account-card-head">
-              <span>Data</span>
-            </div>
-            {dataStatus && <p className="form-note warning data-status" role="alert">{dataStatus}</p>}
-            <div className="data-action-group">
-              <span className="data-action-label">All data</span>
-              <div className="data-action-grid">
-                <button className="secondary-button" type="button" disabled={isDataBusy} onClick={() => void exportJsonBackup()}>
-                  <Download size={16} />
-                  Backup all
-                </button>
-                <label className={isDataBusy ? "file-button data-file-button disabled" : "file-button data-file-button"}>
-                  <Upload size={16} />
-                  Restore all
-                  <input type="file" accept="application/json,.json" disabled={isDataBusy} onChange={(event) => void prepareJsonRestore(event)} />
-                </label>
-              </div>
-              <p className={backupIsDue(data.appSettings.lastBackupAt, backupRecordCount) ? "form-note warning backup-freshness" : "muted small backup-freshness"}>
-                {backupLabel(data.appSettings.lastBackupAt, backupRecordCount)}
-              </p>
-            </div>
-            <div className="data-action-group csv-actions">
-              <span className="data-action-label">Expenses only</span>
-              <div className="data-action-grid">
-                <button className="secondary-button" type="button" disabled={isDataBusy} onClick={() => void exportCsv()}>
-                  <Download size={16} />
-                  Export CSV
-                </button>
-                <label className={isDataBusy ? "file-button data-file-button disabled" : "file-button data-file-button"}>
-                  <Upload size={16} />
-                  Import CSV
-                  <input type="file" accept=".csv,text/csv" disabled={isDataBusy} onChange={(event) => void prepareCsvImport(event)} />
-                </label>
-              </div>
-            </div>
-            {pendingRestore && (
-              <div className="data-confirm-box">
-                <strong>Restore all data?</strong>
-                <small className="data-file-name">{pendingRestore.fileName}</small>
-                <span>{dataSummaryLabel(pendingRestore.summary, true)}</span>
-                <p>Current data is backed up first, then replaced.</p>
-                <div>
-                  <button className="secondary-button" type="button" disabled={isDataBusy} onClick={() => setPendingRestore(null)}>
-                    Cancel
-                  </button>
-                  <button className="secondary-button danger-button" type="button" disabled={isDataBusy} onClick={() => void confirmJsonRestore()}>
-                    Backup & restore
-                  </button>
-                </div>
-              </div>
-            )}
-            {pendingCsvImport && (
-              <div className="data-confirm-box">
-                <strong>Import {countLabel(pendingCsvImport.count, "entry", "entries")}?</strong>
-                <small className="data-file-name">{pendingCsvImport.fileName}</small>
-                {(pendingCsvImport.duplicateCount > 0 || pendingCsvImport.errors.length > 0) && (
-                  <p>
-                    {countLabel(pendingCsvImport.duplicateCount + pendingCsvImport.errors.length, "row")} skipped as duplicate or invalid.
-                  </p>
-                )}
-                <div>
-                  <button className="secondary-button" type="button" disabled={isDataBusy} onClick={() => setPendingCsvImport(null)}>
-                    Cancel
-                  </button>
-                  <button className="secondary-button" type="button" disabled={isDataBusy} onClick={() => void confirmCsvImport()}>
-                    Import
-                  </button>
-                </div>
-              </div>
-            )}
-            {hasResettableData && <div className="data-reset-row">
-              {isResettingData ? (
-                <div className="data-confirm-box danger">
-                  <strong>Reset spending?</strong>
-                  <span>{dataSummaryLabel(dataSummary)}</span>
-                  <p>Categories and appearance stay. A backup downloads first.</p>
-                  <div>
-                    <button className="secondary-button" type="button" disabled={isDataBusy} onClick={() => setIsResettingData(false)}>
-                      Cancel
-                    </button>
-                    <button className="secondary-button danger-button" type="button" disabled={isDataBusy} onClick={() => void resetSpendingData()}>
-                      Backup & reset
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button className="secondary-button danger-button data-reset-button" type="button" disabled={isDataBusy} onClick={() => setIsResettingData(true)}>
-                  <RotateCcw size={16} />
-                  Reset spending
-                </button>
-              )}
-            </div>}
-          </section>
         </div>
       )}
 
-      {activeSection === "bills" && (
+      {activeSection === "recurring" && (
         <section className="panel settings-panel">
           {!isAddingBill ? (
             <div className="bill-section-head">
-              <p className="eyebrow">Subscriptions</p>
+              <p className="eyebrow">Recurring spending</p>
               <button className="secondary-button bill-add-button" type="button" onClick={startAddingBill}>
                 <Plus size={16} />
                 Add
@@ -1107,7 +1016,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
               </div>
               {recurringDraftAlreadyRecorded && recurringDraftNextUnrecordedDate && (
                 <p className="form-note warning bill-card-note">
-                  Bill already recorded for this start date. Next due will be {formatDateForField(recurringDraftNextUnrecordedDate)}.
+                  Already recorded for this start date. Next due is {formatDateForField(recurringDraftNextUnrecordedDate)}.
                 </p>
               )}
               <button className="primary-button bill-save-button" type="button" onClick={() => void saveRecurringRule()}>
@@ -1119,7 +1028,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
           {!isAddingBill && (
           <div className="rule-list compact-expense-list bill-entry-list">
             {data.recurringRules.length === 0 ? (
-              <p className="muted small">No recurring bills yet.</p>
+              <p className="muted small">No recurring spending yet.</p>
             ) : (
               data.recurringRules.map((rule) => {
                 const category = data.categories.find((item) => item.id === rule.categoryId);
@@ -1151,10 +1060,10 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
                         </>
                       ) : (
                         <>
-                          <button className="icon-button" type="button" onClick={() => startEditingBill(rule)} aria-label={`Edit ${rule.title}`} title="Edit bill">
+                          <button className="icon-button" type="button" onClick={() => startEditingBill(rule)} aria-label={`Edit ${rule.title}`} title="Edit recurring spending">
                             <Pencil size={16} />
                           </button>
-                          <button className="icon-button danger-icon" type="button" onClick={() => requestRecurringRuleDelete(rule)} aria-label={`Delete ${rule.title}`} title="Delete bill">
+                          <button className="icon-button danger-icon" type="button" onClick={() => requestRecurringRuleDelete(rule)} aria-label={`Delete ${rule.title}`} title="Delete recurring spending">
                             <Trash2 size={16} />
                           </button>
                         </>
@@ -1169,16 +1078,20 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
         </section>
       )}
 
-      {activeSection === "categories" && (
-        <section className="panel settings-panel">
-          <div className="settings-meta-row">
-            <div className="settings-title-actions">
-              <span className="muted small">{data.categories.length} total</span>
+      {activeSection === "spending" && (
+        <div className="spending-settings-stack">
+          <section className="panel settings-panel compact-settings-panel">
+            <div className="compact-settings-head">
+              <div>
+                <strong>Categories</strong>
+                <span>{data.categories.length} total</span>
+              </div>
               <button
                 className={isEditingCategories ? "secondary-button compact-toggle active" : "icon-button"}
                 type="button"
                 onClick={() => {
                   setIsEditingCategories((current) => !current);
+                  setIsAddingCategory(false);
                   setPendingDelete(null);
                 }}
                 aria-label={isEditingCategories ? "Done editing categories" : "Edit categories"}
@@ -1187,80 +1100,72 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
                 {isEditingCategories ? "Done" : <Pencil size={16} />}
               </button>
             </div>
-          </div>
-          <div className="settings-list category-settings-list">
-            {data.categories.map((category) => {
-              const isDeleting = pendingDelete?.kind === "category" && pendingDelete.id === category.id;
-              return (
-                <article className="settings-list-row category-display-row" key={category.id}>
-                  <span className="category-icon-preview" style={{ "--category-color": category.color } as CSSProperties}>
+            {pendingCategoryDelete && (
+              <div className="compact-delete-confirm" role="alertdialog" aria-label={`Delete ${pendingCategoryDelete.name}?`}>
+                <strong>Delete {pendingCategoryDelete.name}?</strong>
+                <div>
+                  <button className="secondary-button" type="button" onClick={() => setPendingDelete(null)}>Cancel</button>
+                  <button className="secondary-button danger-button" type="button" onClick={() => void deleteCategory(pendingCategoryDelete)}>Delete</button>
+                </div>
+              </div>
+            )}
+            <div className="settings-option-grid" aria-label="Saved categories">
+              {data.categories.map((category) => (
+                <article className={pendingCategoryDelete?.id === category.id ? "settings-option-card pending" : "settings-option-card"} key={category.id}>
+                  <span className="category-icon-preview compact" style={{ "--category-color": category.color } as CSSProperties}>
                     {category.icon ?? "•"}
                   </span>
-                  <div>
-                    <strong>{category.name}</strong>
-                  </div>
-                  <div className={isDeleting ? "row-actions confirming settings-confirm-actions" : "row-actions settings-confirm-actions"}>
-                    {isDeleting ? (
-                      <>
-                        <button className="secondary-button" type="button" onClick={() => setPendingDelete(null)}>
-                          Cancel
-                        </button>
-                        <button className="secondary-button danger-button" type="button" onClick={() => void deleteCategory(category)}>
-                          Delete
-                        </button>
-                      </>
-                    ) : isEditingCategories ? (
-                      <button className="icon-button danger-icon" type="button" onClick={() => requestCategoryDelete(category)} aria-label={`Delete ${category.name}`} title="Delete category">
-                        <Trash2 size={16} />
-                      </button>
-                    ) : null}
-                  </div>
+                  <strong title={category.name}>{category.name}</strong>
+                  {isEditingCategories && (
+                    <button className="icon-button danger-icon compact-delete-button" type="button" onClick={() => requestCategoryDelete(category)} aria-label={`Delete ${category.name}`} title="Delete category">
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </article>
-              );
-            })}
-          </div>
-          {!isAddingCategory ? (
-            <button
-              className="add-card-button settings-bottom-add"
-              type="button"
-              onClick={() => {
-                setIsAddingCategory(true);
-                setStatus("");
-              }}
-            >
-              <Plus size={17} />
-              Add category
-            </button>
-          ) : (
-            <div className="settings-subpanel settings-inline-form settings-bottom-form">
-              <div className="add-row category-add-row settings-add-row">
-                <input maxLength={MAX_CATEGORY_NAME_LENGTH} value={newCategoryName} placeholder="New category" onChange={(event) => setNewCategoryName(event.target.value)} />
-                <input value={newCategoryIcon} placeholder="Icon" onChange={(event) => setNewCategoryIcon(event.target.value.slice(0, 2))} />
-                <input type="color" value={newCategoryColor} onChange={(event) => setNewCategoryColor(event.target.value)} aria-label="New category color" />
-              </div>
-              <div className="settings-form-actions">
-                <button className="primary-button" type="button" onClick={() => void addCategory()}>
-                  Save
-                </button>
-                <button className="secondary-button" type="button" onClick={() => setIsAddingCategory(false)}>
-                  Cancel
-                </button>
-              </div>
+              ))}
             </div>
-          )}
-        </section>
-      )}
+            {!isAddingCategory ? (
+              <button
+                className="add-card-button settings-bottom-add compact-add-button"
+                type="button"
+                onClick={() => {
+                  setIsAddingCategory(true);
+                  setIsEditingCategories(false);
+                  setIsAddingPayment(false);
+                  setPendingDelete(null);
+                  setStatus("");
+                }}
+              >
+                <Plus size={16} />
+                Add category
+              </button>
+            ) : (
+              <div className="settings-subpanel settings-inline-form settings-bottom-form compact-add-form">
+                <div className="add-row category-add-row settings-add-row">
+                  <input maxLength={MAX_CATEGORY_NAME_LENGTH} value={newCategoryName} placeholder="New category" onChange={(event) => setNewCategoryName(event.target.value)} />
+                  <input value={newCategoryIcon} placeholder="Icon" aria-label="Category icon" onChange={(event) => setNewCategoryIcon(event.target.value.slice(0, 2))} />
+                  <input type="color" value={newCategoryColor} onChange={(event) => setNewCategoryColor(event.target.value)} aria-label="New category color" />
+                </div>
+                <div className="settings-form-actions">
+                  <button className="primary-button" type="button" onClick={() => void addCategory()}>Save</button>
+                  <button className="secondary-button" type="button" onClick={() => setIsAddingCategory(false)}>Cancel</button>
+                </div>
+              </div>
+            )}
+          </section>
 
-      {activeSection === "payments" && (
-        <section className="panel settings-panel">
-          <div className="settings-meta-row">
-            <div className="settings-title-actions">
-              <span className="muted small">{data.appSettings.paymentMethods.length} total</span>
+          <section className="panel settings-panel compact-settings-panel">
+            <div className="compact-settings-head">
+              <div>
+                <strong>Payment methods</strong>
+                <span>{data.appSettings.paymentMethods.length} total</span>
+              </div>
               <button
                 className={isEditingPayments ? "secondary-button compact-toggle active" : "icon-button"}
                 type="button"
                 onClick={() => {
                   setIsEditingPayments((current) => !current);
+                  setIsAddingPayment(false);
                   setPendingDelete(null);
                 }}
                 aria-label={isEditingPayments ? "Done editing payment methods" : "Edit payment methods"}
@@ -1269,64 +1174,190 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
                 {isEditingPayments ? "Done" : <Pencil size={16} />}
               </button>
             </div>
-          </div>
-          <div className="settings-list payment-settings-list">
-            {data.appSettings.paymentMethods.map((method) => {
-              const isDeleting = pendingDelete?.kind === "payment" && pendingDelete.id === method;
-              return (
-                <article className="settings-list-row payment-settings-row" key={method}>
-                  <div className="payment-dot" aria-hidden="true" />
-                  <div>
-                    <strong>{method}</strong>
-                  </div>
-                  <div className={isDeleting ? "row-actions confirming settings-confirm-actions" : "row-actions settings-confirm-actions"}>
-                    {isDeleting ? (
-                      <>
-                        <button className="secondary-button" type="button" onClick={() => setPendingDelete(null)}>
-                          Cancel
-                        </button>
-                        <button className="secondary-button danger-button" type="button" onClick={() => void removePaymentMethod(method)}>
-                          Delete
-                        </button>
-                      </>
-                    ) : isEditingPayments ? (
-                      <button className="icon-button danger-icon" type="button" onClick={() => requestPaymentMethodRemoval(method)} aria-label={`Remove ${method}`} title="Remove payment method">
-                        <Trash2 size={16} />
-                      </button>
-                    ) : null}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-          {!isAddingPayment ? (
-            <button
-              className="add-card-button settings-bottom-add"
-              type="button"
-              onClick={() => {
-                setIsAddingPayment(true);
-                setStatus("");
-              }}
-            >
-              <Plus size={17} />
-              Add payment method
-            </button>
-          ) : (
-            <div className="settings-subpanel settings-inline-form settings-bottom-form">
-              <div className="add-row settings-add-row">
-                <input maxLength={MAX_PAYMENT_METHOD_LENGTH} value={newMethod} placeholder="New payment method" onChange={(event) => setNewMethod(event.target.value)} />
+            {pendingPaymentDelete && (
+              <div className="compact-delete-confirm" role="alertdialog" aria-label={`Delete ${pendingPaymentDelete}?`}>
+                <strong>Delete {pendingPaymentDelete}?</strong>
+                <div>
+                  <button className="secondary-button" type="button" onClick={() => setPendingDelete(null)}>Cancel</button>
+                  <button className="secondary-button danger-button" type="button" onClick={() => void removePaymentMethod(pendingPaymentDelete)}>Delete</button>
+                </div>
               </div>
-              <div className="settings-form-actions">
-                <button className="primary-button" type="button" onClick={() => void addPaymentMethod()}>
-                  Save
+            )}
+            <div className="settings-option-grid payment-option-grid" aria-label="Saved payment methods">
+              {data.appSettings.paymentMethods.map((method) => (
+                <article className={pendingPaymentDelete === method ? "settings-option-card pending" : "settings-option-card"} key={method}>
+                  <span className="payment-dot" aria-hidden="true" />
+                  <strong title={method}>{method}</strong>
+                  {isEditingPayments && (
+                    <button className="icon-button danger-icon compact-delete-button" type="button" onClick={() => requestPaymentMethodRemoval(method)} aria-label={`Delete ${method}`} title="Delete payment method">
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </article>
+              ))}
+            </div>
+            {!isAddingPayment ? (
+              <button
+                className="add-card-button settings-bottom-add compact-add-button"
+                type="button"
+                onClick={() => {
+                  setIsAddingPayment(true);
+                  setIsEditingPayments(false);
+                  setIsAddingCategory(false);
+                  setPendingDelete(null);
+                  setStatus("");
+                }}
+              >
+                <Plus size={16} />
+                Add payment method
+              </button>
+            ) : (
+              <div className="settings-subpanel settings-inline-form settings-bottom-form compact-add-form">
+                <div className="add-row settings-add-row">
+                  <input maxLength={MAX_PAYMENT_METHOD_LENGTH} value={newMethod} placeholder="New payment method" onChange={(event) => setNewMethod(event.target.value)} />
+                </div>
+                <div className="settings-form-actions">
+                  <button className="primary-button" type="button" onClick={() => void addPaymentMethod()}>Save</button>
+                  <button className="secondary-button" type="button" onClick={() => setIsAddingPayment(false)}>Cancel</button>
+                </div>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+
+      {activeSection === "general" && (
+        <div className="general-settings-stack">
+          <section className={isGuideOpen ? "panel settings-panel help-card open" : "panel settings-panel help-card"}>
+            <button
+              className="help-card-toggle"
+              type="button"
+              aria-expanded={isGuideOpen}
+              aria-controls="localspend-quick-guide"
+              onClick={() => setIsGuideOpen((current) => !current)}
+            >
+              <span className="help-card-icon" aria-hidden="true"><BookOpen size={19} /></span>
+              <span className="help-card-copy">
+                <strong>Quick guide</strong>
+                <small>The everyday LocalSpend flow</small>
+              </span>
+              <ChevronDown className="help-card-chevron" size={18} aria-hidden="true" />
+            </button>
+            {isGuideOpen && (
+              <div className="help-guide" id="localspend-quick-guide">
+                <div className="guide-preview-grid">
+                  <article className="guide-step">
+                    <div className="guide-shot guide-today-shot" aria-hidden="true">
+                      <span>Today</span>
+                      <strong>SGD 12.50</strong>
+                      <i><Plus size={11} /> Add</i>
+                    </div>
+                    <div><strong>Record</strong><p>Tap Add, enter an amount or natural phrase, check the details, then save.</p></div>
+                  </article>
+                  <article className="guide-step">
+                    <div className="guide-shot guide-calendar-shot" aria-hidden="true">
+                      {[7, 8, 9, 10, 11, 12, 13].map((day) => <i className={day === 12 ? "active" : ""} key={day}>{day}</i>)}
+                    </div>
+                    <div><strong>Review</strong><p>Calendar shows each day. Select one to add, edit, or remove its entries.</p></div>
+                  </article>
+                  <article className="guide-step">
+                    <div className="guide-shot guide-summary-shot" aria-hidden="true">
+                      <span className="guide-donut" />
+                      <span><i /> Food & Drinks<strong>58%</strong></span>
+                    </div>
+                    <div><strong>Understand</strong><p>Summary tracks your budget and category mix. Tap a category for its entries.</p></div>
+                  </article>
+                </div>
+                <div className="guide-utility-list">
+                  <div><Repeat2 size={17} /><span><strong>Recurring</strong><small>Schedule bills or subscriptions; due reminders appear on Today.</small></span></div>
+                  <div><SlidersHorizontal size={17} /><span><strong>Spending & appearance</strong><small>Choose currencies, categories, payment methods, colors, and wallpaper.</small></span></div>
+                  <div><ShieldCheck size={17} /><span><strong>Your data</strong><small>Records stay on this device. Back up before moving or clearing it.</small></span></div>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="panel settings-panel data-control-card" aria-busy={isDataBusy}>
+            <div className="account-card-head"><span>Data</span></div>
+            {dataStatus && <p className="form-note warning data-status" role="alert">{dataStatus}</p>}
+            <div className="data-action-group">
+              <span className="data-action-label">All data</span>
+              <div className="data-action-grid">
+                <button className="secondary-button" type="button" disabled={isDataBusy} onClick={() => void exportJsonBackup()}>
+                  <Download size={16} />
+                  Backup all
                 </button>
-                <button className="secondary-button" type="button" onClick={() => setIsAddingPayment(false)}>
-                  Cancel
+                <label className={isDataBusy ? "file-button data-file-button disabled" : "file-button data-file-button"}>
+                  <Upload size={16} />
+                  Restore all
+                  <input type="file" accept="application/json,.json" disabled={isDataBusy} onChange={(event) => void prepareJsonRestore(event)} />
+                </label>
+              </div>
+              <p className={backupIsDue(data.appSettings.lastBackupAt, backupRecordCount) ? "form-note warning backup-freshness" : "muted small backup-freshness"}>
+                {backupLabel(data.appSettings.lastBackupAt, backupRecordCount)}
+              </p>
+            </div>
+            <div className="data-action-group csv-actions">
+              <span className="data-action-label">Expenses only</span>
+              <div className="data-action-grid">
+                <button className="secondary-button" type="button" disabled={isDataBusy} onClick={() => void exportCsv()}>
+                  <Download size={16} />
+                  Export CSV
                 </button>
+                <label className={isDataBusy ? "file-button data-file-button disabled" : "file-button data-file-button"}>
+                  <Upload size={16} />
+                  Import CSV
+                  <input type="file" accept=".csv,text/csv" disabled={isDataBusy} onChange={(event) => void prepareCsvImport(event)} />
+                </label>
               </div>
             </div>
-          )}
-        </section>
+            {pendingRestore && (
+              <div className="data-confirm-box">
+                <strong>Restore all data?</strong>
+                <small className="data-file-name">{pendingRestore.fileName}</small>
+                <span>{dataSummaryLabel(pendingRestore.summary, true)}</span>
+                <p>Current data is backed up first, then replaced.</p>
+                <div>
+                  <button className="secondary-button" type="button" disabled={isDataBusy} onClick={() => setPendingRestore(null)}>Cancel</button>
+                  <button className="secondary-button danger-button" type="button" disabled={isDataBusy} onClick={() => void confirmJsonRestore()}>Backup & restore</button>
+                </div>
+              </div>
+            )}
+            {pendingCsvImport && (
+              <div className="data-confirm-box">
+                <strong>Import {countLabel(pendingCsvImport.count, "entry", "entries")}?</strong>
+                <small className="data-file-name">{pendingCsvImport.fileName}</small>
+                {(pendingCsvImport.duplicateCount > 0 || pendingCsvImport.errors.length > 0) && (
+                  <p>{countLabel(pendingCsvImport.duplicateCount + pendingCsvImport.errors.length, "row")} skipped as duplicate or invalid.</p>
+                )}
+                <div>
+                  <button className="secondary-button" type="button" disabled={isDataBusy} onClick={() => setPendingCsvImport(null)}>Cancel</button>
+                  <button className="secondary-button" type="button" disabled={isDataBusy} onClick={() => void confirmCsvImport()}>Import</button>
+                </div>
+              </div>
+            )}
+            {hasResettableData && (
+              <div className="data-reset-row">
+                {isResettingData ? (
+                  <div className="data-confirm-box danger">
+                    <strong>Reset spending?</strong>
+                    <span>{dataSummaryLabel(dataSummary)}</span>
+                    <p>Categories and appearance stay. A backup downloads first.</p>
+                    <div>
+                      <button className="secondary-button" type="button" disabled={isDataBusy} onClick={() => setIsResettingData(false)}>Cancel</button>
+                      <button className="secondary-button danger-button" type="button" disabled={isDataBusy} onClick={() => void resetSpendingData()}>Backup & reset</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button className="secondary-button danger-button data-reset-button" type="button" disabled={isDataBusy} onClick={() => setIsResettingData(true)}>
+                    <RotateCcw size={16} />
+                    Reset spending
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
+        </div>
       )}
     </div>
   );

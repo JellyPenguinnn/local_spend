@@ -5,7 +5,7 @@
 - Today: quick expense entry, natural language draft, today's list, recurring due actions.
 - Calendar: monthly grid, daily totals, spending intensity, selected day details.
 - Summary: monthly totals, average day, highest day, top category, donut chart, budgets, comments.
-- Settings: appearance, currency, custom wallpapers, bills, categories, and payment methods.
+- Settings: Appearance, Recurring, Spending setup, and General help/data controls.
 
 ## Profile Model
 
@@ -34,7 +34,7 @@
 - Month selection uses app-owned month/year controls from 2025 onward, so it works on iPhone even where native month inputs are limited.
 - Summary calculates category distribution, month-over-month comparison, budget progress, and deterministic comments.
 - Summary category boxes open a monthly category detail view showing each matching spend with date, title, and amount.
-- Category management can add, rename, recolor, and safely remove unused categories.
+- Spending setup keeps compact category and payment-method controls together; both support progressive add flows and confirmed removal.
 - Recurring rules can use any enabled spending currency and generate due expenses after user confirmation. Foreign occurrences capture a dated base-currency conversion when recorded.
 - Bill `Start date` is editable and defines the schedule pattern. The app stores `Next Due` separately, advances it after recording, skips exact already-recorded bill expenses, and resolves edited past start dates forward instead of backfilling old reminders.
 - `Record bill(s)` records at most one missing due occurrence per bill rule per tap. If several months are overdue, the reminder remains due after each confirmation so the user can choose whether to catch up one occurrence at a time instead of silently bulk-creating history.
@@ -54,6 +54,13 @@
 - Users can optionally import their own wallpaper images for an adjustable app background.
 - Imported wallpapers are compressed, stored locally with the active profile, capped at 5 images, and removable.
 - LocalSpend does not bundle copyrighted character wallpapers, logos, or online assets.
+
+## Settings Organization
+
+- Appearance contains currencies, light/dark mode, accent colors, and wallpaper.
+- Recurring manages scheduled bills and subscriptions.
+- Spending contains categories and payment methods in one compact view.
+- General contains an optional visual quick guide and profile-scoped data controls.
 
 ## Import, Export, Backup, Restore
 

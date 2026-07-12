@@ -4,7 +4,7 @@ import { createBackup } from "../lib/backup";
 import { exportExpensesCsv } from "../lib/csv";
 import { createDefaultProfileData } from "../lib/defaults";
 import type { LocalSpendRepository } from "../lib/storage/repository";
-import type { Expense, ProfileMeta } from "../lib/types";
+import type { Expense, ProfileData, ProfileMeta } from "../lib/types";
 import { SettingsScreen } from "./SettingsScreen";
 
 const profile: ProfileMeta = {
@@ -31,7 +31,7 @@ describe("Settings data controls", () => {
     data.expenses = [makeExpense(data.categories[0].id, "2026-07-11", 6.5, "Lunch")];
     const repository = createRepositoryMock();
     const saveData = vi.fn().mockResolvedValue(true);
-    render(<SettingsScreen activeProfile={profile} data={data} repository={repository} saveData={saveData} />);
+    renderDataSettings(data, repository, saveData);
 
     expect(screen.getByText("All data")).toBeInTheDocument();
     expect(screen.getByText("Expenses only")).toBeInTheDocument();
@@ -58,7 +58,7 @@ describe("Settings data controls", () => {
     ];
     const repository = createRepositoryMock();
     const saveData = vi.fn().mockResolvedValue(true);
-    render(<SettingsScreen activeProfile={profile} data={current} repository={repository} saveData={saveData} />);
+    renderDataSettings(current, repository, saveData);
 
     const json = createBackup(profile, restored, "2026-07-11T12:00:00.000Z");
     fireEvent.change(screen.getByLabelText("Restore all"), { target: { files: [textFile("backup.json", json, "application/json")] } });
@@ -82,7 +82,7 @@ describe("Settings data controls", () => {
     const data = createDefaultProfileData();
     const repository = createRepositoryMock();
     const saveData = vi.fn().mockResolvedValue(true);
-    render(<SettingsScreen activeProfile={profile} data={data} repository={repository} saveData={saveData} />);
+    renderDataSettings(data, repository, saveData);
 
     const restoreInput = screen.getByLabelText("Restore all");
     fireEvent.change(restoreInput, {
@@ -101,7 +101,7 @@ describe("Settings data controls", () => {
     data.budgets = [{ id: "budget_1", month: "2026-07", categoryId: null, amount: 500 }];
     const repository = createRepositoryMock();
     const saveData = vi.fn().mockResolvedValue(true);
-    render(<SettingsScreen activeProfile={profile} data={data} repository={repository} saveData={saveData} />);
+    renderDataSettings(data, repository, saveData);
 
     fireEvent.click(screen.getByRole("button", { name: "Reset spending" }));
     expect(screen.getByText("1 entry · 0 bills · 1 budget")).toBeInTheDocument();
@@ -127,7 +127,7 @@ describe("Settings data controls", () => {
     const repository = createRepositoryMock();
     vi.mocked(repository.saveProfileFile).mockRejectedValue(new Error("Backup could not be saved."));
     const saveData = vi.fn().mockResolvedValue(true);
-    render(<SettingsScreen activeProfile={profile} data={data} repository={repository} saveData={saveData} />);
+    renderDataSettings(data, repository, saveData);
 
     fireEvent.click(screen.getByRole("button", { name: "Reset spending" }));
     fireEvent.click(screen.getByRole("button", { name: "Backup & reset" }));
@@ -153,7 +153,7 @@ describe("Settings data controls", () => {
     data.appSettings.enabledCurrencies = ["SGD"];
     const repository = createRepositoryMock();
     const saveData = vi.fn().mockResolvedValue(true);
-    render(<SettingsScreen activeProfile={profile} data={data} repository={repository} saveData={saveData} />);
+    renderDataSettings(data, repository, saveData);
 
     const csv = exportExpensesCsv([existing, foreign, foreign], data.categories);
     fireEvent.change(screen.getByLabelText("Import CSV"), { target: { files: [textFile("expenses.csv", csv, "text/csv")] } });
@@ -169,6 +169,44 @@ describe("Settings data controls", () => {
     expect(importedData.appSettings.paymentMethods).toContain("Touch n Go");
   });
 });
+
+describe("Settings organization", () => {
+  it("groups categories and payment methods in one compact Spending section", () => {
+    const data = createDefaultProfileData();
+    render(<SettingsScreen activeProfile={profile} data={data} repository={createRepositoryMock()} saveData={vi.fn().mockResolvedValue(true)} />);
+
+    expect(screen.getByRole("button", { name: "Appearance" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Recurring" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Spending" }));
+
+    expect(screen.getByText("Categories")).toBeInTheDocument();
+    expect(screen.getByText("Payment methods")).toBeInTheDocument();
+    expect(screen.getByLabelText("Saved categories")).toBeInTheDocument();
+    expect(screen.getByLabelText("Saved payment methods")).toBeInTheDocument();
+  });
+
+  it("keeps the visual guide optional beside the data controls", () => {
+    const data = createDefaultProfileData();
+    render(<SettingsScreen activeProfile={profile} data={data} repository={createRepositoryMock()} saveData={vi.fn().mockResolvedValue(true)} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "General" }));
+    expect(screen.getByText("Data")).toBeInTheDocument();
+    const guide = screen.getByRole("button", { name: /Quick guide/ });
+    expect(guide).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(guide);
+
+    expect(guide).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Record")).toBeInTheDocument();
+    expect(screen.getByText("Review")).toBeInTheDocument();
+    expect(screen.getByText("Understand")).toBeInTheDocument();
+    expect(screen.getByText("Your data")).toBeInTheDocument();
+  });
+});
+
+function renderDataSettings(data: ProfileData, repository: LocalSpendRepository, saveData: (data: ProfileData) => Promise<boolean>) {
+  render(<SettingsScreen activeProfile={profile} data={data} repository={repository} saveData={saveData} />);
+  fireEvent.click(screen.getByRole("button", { name: "General" }));
+}
 
 function textFile(name: string, contents: string, type: string): File {
   const file = new File([contents], name, { type });

@@ -71,6 +71,7 @@
 - Simplified foreign entry: automatic base-currency conversion is now a read-only reporting value, with manual input shown only when no rate is available; General settings now marks the locked main currency with a compact lock cue.
 - Hardened local data controls: complete validated JSON backups, automatic safety backups before restore/reset, persistent browser-storage requests, file-size/date/reference checks, duplicate-safe CSV import, and spreadsheet-formula-safe CSV export.
 - Finalized the local data footprint: atomic sectioned IndexedDB migration, changed-section-only writes, same-origin-only PWA caching, compact JSON backups, and automatic stale-draft pruning.
+- Reorganized Settings into Appearance, Recurring, Spending, and General; merged categories and payment methods into compact grids; and added an optional screenshot-style quick guide beside local data controls.
 
 ## Follow-Up Polish
 

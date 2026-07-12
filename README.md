@@ -16,8 +16,8 @@ LocalSpend is a local-first spending tracker for fast daily expense entry, month
 - **Mixed currencies**: keep the original amount, such as `MYR 18.00`, while budgets and summaries use a stable SGD equivalent.
 - **Calendar**: review monthly daily totals, select a day, and add or edit entries for that date.
 - **Summary**: view monthly total, budget progress, category donut chart, and category-level spending details.
-- **Bills**: create recurring bills or subscriptions with daily, weekly, monthly, or annual cadence.
-- **Settings**: manage currency, light/dark mode, accent colors, wallpapers, bills, categories, payment methods, and data controls.
+- **Recurring spending**: schedule bills or subscriptions with daily, weekly, monthly, or annual cadence.
+- **Settings**: use Appearance, Recurring, Spending, and General sections for customization, entry options, a visual quick guide, and local data controls.
 - **Data controls**: CSV import/export, JSON backup/restore, and safe local spending reset.
 - **Custom look**: choose calm accent colors and import up to 5 local wallpapers.
 

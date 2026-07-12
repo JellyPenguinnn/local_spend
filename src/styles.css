@@ -2266,6 +2266,14 @@ h3 {
   gap: 0.85rem;
 }
 
+.spending-settings-stack,
+.general-settings-stack {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 0.85rem;
+}
+
 .appearance-block {
   padding: 0.85rem;
 }
@@ -2391,6 +2399,362 @@ h3 {
 .data-control-card {
   display: grid;
   gap: 0.72rem;
+}
+
+.compact-settings-panel {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.85rem;
+}
+
+.compact-settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.compact-settings-head > div {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.compact-settings-head > div > strong {
+  font-size: 0.94rem;
+}
+
+.compact-settings-head > div > span {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 720;
+}
+
+.settings-option-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.42rem;
+}
+
+.settings-option-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.46rem;
+  min-width: 0;
+  min-height: 43px;
+  border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+  border-radius: var(--radius);
+  padding: 0.38rem 0.42rem;
+  background: color-mix(in srgb, var(--surface) 94%, var(--accent) 6%);
+}
+
+.settings-option-card.pending {
+  border-color: color-mix(in srgb, var(--danger) 34%, var(--border));
+  background: color-mix(in srgb, var(--danger) 5%, var(--surface));
+}
+
+.settings-option-card > strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.79rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-icon-preview.compact {
+  width: 29px;
+  height: 29px;
+  font-size: 0.88rem;
+}
+
+.payment-option-grid .payment-dot {
+  width: 0.66rem;
+  height: 0.66rem;
+  margin: 0 0.42rem;
+}
+
+.compact-delete-button {
+  width: 30px;
+  height: 30px;
+  box-shadow: none;
+}
+
+.compact-delete-confirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--danger) 28%, var(--border));
+  border-radius: var(--radius);
+  padding: 0.5rem 0.58rem;
+  background: color-mix(in srgb, var(--danger) 5%, var(--surface));
+}
+
+.compact-delete-confirm > strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.76rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-delete-confirm > div {
+  display: flex;
+  gap: 0.38rem;
+  flex: 0 0 auto;
+}
+
+.compact-delete-confirm .secondary-button {
+  min-height: 32px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.7rem;
+}
+
+.compact-add-button {
+  min-height: 42px;
+  margin-top: 0;
+  margin-bottom: 0;
+  font-size: 0.78rem;
+}
+
+.compact-add-form {
+  margin-top: 0;
+}
+
+.help-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.help-card-toggle {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  min-height: 64px;
+  border: 0;
+  padding: 0.72rem 0.8rem;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.help-card-toggle:hover {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.help-card-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius);
+  background: var(--accent-wash-strong);
+  color: var(--accent);
+}
+
+.help-card-copy {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.help-card-copy strong {
+  font-size: 0.91rem;
+}
+
+.help-card-copy small {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.help-card-chevron {
+  color: var(--muted);
+  transition: transform 180ms ease;
+}
+
+.help-card.open .help-card-chevron {
+  transform: rotate(180deg);
+}
+
+.help-guide {
+  display: grid;
+  gap: 0.8rem;
+  border-top: 1px solid var(--hairline);
+  padding: 0.8rem;
+}
+
+.guide-preview-grid {
+  display: grid;
+  gap: 0.58rem;
+}
+
+.guide-step {
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.guide-step > div:last-child {
+  display: grid;
+  gap: 0.16rem;
+}
+
+.guide-step > div:last-child > strong {
+  font-size: 0.8rem;
+}
+
+.guide-step p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
+.guide-shot {
+  position: relative;
+  min-height: 76px;
+  border: 1px solid color-mix(in srgb, var(--accent) 17%, var(--border));
+  border-radius: var(--radius);
+  padding: 0.48rem;
+  overflow: hidden;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--accent) 10%, var(--surface)), var(--surface));
+  box-shadow: var(--inner-glow);
+}
+
+.guide-today-shot {
+  display: grid;
+  align-content: start;
+  gap: 0.1rem;
+}
+
+.guide-today-shot > span {
+  color: var(--muted);
+  font-size: 0.47rem;
+  font-style: normal;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.guide-today-shot > strong {
+  font-size: 1.02rem;
+}
+
+.guide-today-shot > i {
+  position: absolute;
+  right: 0.4rem;
+  bottom: 0.4rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  border-radius: 999px;
+  padding: 0.24rem 0.38rem;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.52rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.guide-calendar-shot {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-content: center;
+  gap: 0.22rem;
+}
+
+.guide-calendar-shot > i {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.48rem;
+  font-style: normal;
+  font-weight: 780;
+}
+
+.guide-calendar-shot > i.active {
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--border));
+  background: var(--accent-wash-strong);
+  color: var(--text);
+}
+
+.guide-summary-shot {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.42rem;
+}
+
+.guide-donut {
+  width: 44px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: conic-gradient(var(--accent) 0 58%, color-mix(in srgb, var(--accent) 34%, var(--surface)) 58% 78%, var(--hairline) 78%);
+  box-shadow: inset 0 0 0 10px var(--surface);
+}
+
+.guide-summary-shot > span:last-child {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.48rem;
+}
+
+.guide-summary-shot > span:last-child > i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.guide-summary-shot > span:last-child > strong {
+  color: var(--text);
+  font-size: 0.52rem;
+}
+
+.guide-utility-list {
+  display: grid;
+  gap: 0.42rem;
+  border-top: 1px solid var(--hairline);
+  padding-top: 0.72rem;
+}
+
+.guide-utility-list > div {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.guide-utility-list svg {
+  color: var(--accent);
+}
+
+.guide-utility-list span {
+  display: grid;
+  gap: 0.06rem;
+}
+
+.guide-utility-list strong {
+  font-size: 0.73rem;
+}
+
+.guide-utility-list small {
+  color: var(--muted);
+  font-size: 0.66rem;
+  line-height: 1.32;
 }
 
 .data-action-group {
@@ -3486,6 +3850,8 @@ h3 {
   .calendar-layout,
   .settings-screen,
   .settings-tabs,
+  .spending-settings-stack,
+  .general-settings-stack,
   .settings-two-col,
   .action-grid,
   .purpose-strip,
@@ -4104,6 +4470,7 @@ h3 {
   .settings-tabs {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.22rem;
     overflow: visible;
     padding: 0.25rem;
   }
@@ -4197,5 +4564,12 @@ h3 {
   .button-row > *,
   .add-row > * {
     flex: 1 1 160px;
+  }
+}
+
+@media (max-width: 360px) {
+  .settings-tabs button {
+    padding-inline: 0.12rem;
+    font-size: 0.65rem;
   }
 }

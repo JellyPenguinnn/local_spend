@@ -24,6 +24,10 @@ Desktop builds use a Tauri command backed by the OS keyring crate for provider A
 
 LocalSpend uses a clean light/dark base with a profile-specific accent color. Instead of bundling cartoon or character wallpapers, users can import their own local wallpaper images. Imported wallpapers are compressed, stored with the active profile settings, capped at 5 images, and rendered behind the app with adjustable subtle-to-visible transparency.
 
+## Settings Information Architecture
+
+Settings uses four task-based sections: Appearance, Recurring, Spending, and General. Categories and payment methods share the compact Spending view because both configure expense entry. General keeps the optional visual guide beside backup, restore, CSV, and reset controls so everyday customization stays separate from maintenance tasks.
+
 ## iPhone Use Path
 
 LocalSpend keeps the Tauri macOS app, but the frontend is now mobile-first and installable as a PWA-style web app when hosted privately. This is the practical personal iPhone route without App Store distribution. Native iOS packaging with Tauri remains possible later, but sharing it with friends requires Apple's iOS signing/TestFlight flow.
