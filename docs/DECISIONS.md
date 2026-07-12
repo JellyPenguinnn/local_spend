@@ -61,3 +61,9 @@ Historical expenses are never revalued when reference rates change. Foreign entr
 Current-date provider quotes use a 30-minute freshness window and are requested again automatically when a later form needs a stale quote. Historical quotes can be reused because the reference for that date is immutable. A provider result dated before the requested date is presented as the latest available reference, which is expected on weekends and closing days; only a failed network request that falls back locally is labelled as a saved offline rate.
 
 Recurring rules store only their original amount and currency; setup does not show a future conversion that could be mistaken for a fixed value. When an occurrence becomes due, Today resolves and displays its dated reporting-currency equivalent before confirmation. Every confirmed occurrence revalidates its own scheduled date, so a later cadence receives a new quote while earlier expense snapshots remain unchanged; current-date quotes obey the normal freshness window. If neither a dated nor prior cached rate is available offline, recording waits instead of silently treating the foreign amount as base currency.
+
+## Multi-Currency Presentation
+
+LocalSpend keeps a single main-currency total because budgets, category percentages, month comparisons, and calendar intensity need one comparable unit. It does not offer a global display toggle that could make totals change meaning from screen to screen.
+
+When a day or month contains foreign spending, the total is followed by a compact native-currency breakdown. Expense rows keep the paid amount primary and the saved main-currency equivalent secondary. Summary breakdown values are actionable and open a monthly currency-specific entry list. This makes travel spending retrievable without revaluing history or mixing incomparable native amounts into one total.

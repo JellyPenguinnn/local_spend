@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildMonthlyInsightCards, calculateSafeToSpend, getCategoryTotals, getUpcomingRecurringItems, hasDuplicateExpense, summarizeMonth, suggestFromExpenseHistory } from "./analytics";
+import { buildMonthlyInsightCards, calculateSafeToSpend, getCategoryTotals, getCurrencyTotals, getUpcomingRecurringItems, hasDuplicateExpense, summarizeMonth, suggestFromExpenseHistory } from "./analytics";
 import { restoreBackup, createBackup, summarizeProfileData } from "./backup";
 import { suggestCategoryLocal } from "./categories";
 import { exportExpensesCsv, findNewImportedExpenses, importExpensesCsv } from "./csv";
@@ -240,6 +240,12 @@ describe("expense CRUD helpers and summaries", () => {
     const summary = summarizeMonth([sgd, myr], data.categories, "2026-07");
     expect(summary.total).toBe(19.15);
     expect(summary.categoryTotals.find((item) => item.categoryId === data.categories[1].id)?.total).toBe(9.15);
+
+    const currencies = getCurrencyTotals([sgd, myr], "SGD");
+    expect(currencies).toEqual([
+      { currency: "SGD", amount: 10, baseAmount: 10, count: 1, isBase: true },
+      { currency: "MYR", amount: 30, baseAmount: 9.15, count: 1, isBase: false }
+    ]);
   });
 
   it("calculates safe-to-spend, review cards, and upcoming recurring items", () => {

@@ -9,6 +9,7 @@ import { mostUsedPaymentMethod } from "../lib/payments";
 import { parseExpenseWithAiOrLocal, type AiSecretStore } from "../lib/ai/providers";
 import type { Expense, ExpenseDraft, ProfileData } from "../lib/types";
 import { EmptyState } from "../components/EmptyState";
+import { CurrencyBreakdown } from "../components/CurrencyBreakdown";
 import { ExpenseForm } from "../components/ExpenseForm";
 import { ExpenseList } from "../components/ExpenseList";
 import { FormBackAction } from "../components/FormBackAction";
@@ -157,6 +158,9 @@ export function CalendarScreen({ profileId, data, upsertExpense, deleteExpense, 
               <p className="eyebrow">{selectedPanelLabel}</p>
             </div>
           )}
+          {!isAdding && !editingExpense && (
+            <CurrencyBreakdown expenses={selectedExpenses} baseCurrency={data.appSettings.currency} label="Paid in" />
+          )}
           {(isAdding || editingExpense) && (
             <>
               <FormBackAction
@@ -234,6 +238,7 @@ export function CalendarScreen({ profileId, data, upsertExpense, deleteExpense, 
         <div>
           <p className="eyebrow">Calendar</p>
           <h2>{formatMoney(monthTotal, data.appSettings.currency)}</h2>
+          <CurrencyBreakdown expenses={monthExpenses} baseCurrency={data.appSettings.currency} />
         </div>
         <MonthPicker month={month} onChange={setMonth} />
       </section>

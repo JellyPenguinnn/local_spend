@@ -671,6 +671,71 @@ h3 {
   color: var(--accent);
 }
 
+.currency-breakdown {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.32rem 0.48rem;
+  min-width: 0;
+  margin-top: 0.08rem;
+}
+
+.currency-breakdown-label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 780;
+  white-space: nowrap;
+}
+
+.currency-breakdown-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.currency-breakdown-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.18rem;
+  min-height: 27px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  border-radius: 999px;
+  padding: 0.22rem 0.48rem;
+  background: color-mix(in srgb, var(--accent) 6%, var(--material-raised));
+  color: var(--text);
+  font: inherit;
+  font-size: 0.72rem;
+  line-height: 1;
+  box-shadow: var(--inner-glow);
+  white-space: nowrap;
+}
+
+.currency-breakdown-chip strong {
+  font-size: inherit;
+  font-weight: 820;
+}
+
+button.currency-breakdown-chip.interactive {
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+button.currency-breakdown-chip.interactive:hover,
+button.currency-breakdown-chip.interactive:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 52%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--material-raised));
+}
+
+button.currency-breakdown-chip.interactive:active {
+  transform: scale(0.98);
+}
+
+.day-panel > .currency-breakdown {
+  margin-bottom: 0.72rem;
+}
+
 .hero-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(118px, 1fr));
@@ -1997,6 +2062,12 @@ h3 {
   color: var(--muted);
   font-size: 0.7rem;
   font-weight: 650;
+}
+
+.category-detail-context {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.82rem;
 }
 
 .summary-side-stack {

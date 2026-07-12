@@ -1,7 +1,7 @@
 import { addDays, daysInMonth, formatLocalIsoDate, getMonthParts, parseLocalDate, previousMonthKey } from "./date";
 import { roundMoney } from "./money";
 import { categoryIcon, categoryName } from "./categories";
-import { expenseBaseAmount } from "./currencies";
+import { expenseBaseAmount, normalizeCurrencyCode } from "./currencies";
 import type { Budget, Category, Expense, MonthlyAggregateForAi, RecurringRule } from "./types";
 
 export interface CategoryTotal {
@@ -11,6 +11,14 @@ export interface CategoryTotal {
   total: number;
   percent: number;
   count: number;
+}
+
+export interface CurrencyTotal {
+  currency: string;
+  amount: number;
+  baseAmount: number;
+  count: number;
+  isBase: boolean;
 }
 
 export interface MonthlySummary {
@@ -80,6 +88,30 @@ export function getDailyTotals(expenses: Expense[]): Record<string, number> {
     totals[expense.date] = roundMoney((totals[expense.date] ?? 0) + expenseBaseAmount(expense));
     return totals;
   }, {});
+}
+
+export function getCurrencyTotals(expenses: Expense[], baseCurrency: string): CurrencyTotal[] {
+  const base = normalizeCurrencyCode(baseCurrency);
+  const totals = new Map<string, { amount: number; baseAmount: number; count: number }>();
+
+  for (const expense of expenses) {
+    const currency = normalizeCurrencyCode(expense.currency, base);
+    const current = totals.get(currency) ?? { amount: 0, baseAmount: 0, count: 0 };
+    current.amount += expense.amount;
+    current.baseAmount += expenseBaseAmount(expense);
+    current.count += 1;
+    totals.set(currency, current);
+  }
+
+  return [...totals.entries()]
+    .map(([currency, value]) => ({
+      currency,
+      amount: roundMoney(value.amount),
+      baseAmount: roundMoney(value.baseAmount),
+      count: value.count,
+      isBase: currency === base
+    }))
+    .sort((a, b) => Number(b.isBase) - Number(a.isBase) || b.baseAmount - a.baseAmount || a.currency.localeCompare(b.currency));
 }
 
 export function getCategoryTotals(expenses: Expense[], categories: Category[]): CategoryTotal[] {

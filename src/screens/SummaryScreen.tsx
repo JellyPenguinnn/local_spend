@@ -1,20 +1,31 @@
 import { lazy, Suspense, useMemo, useState } from "react";
 import { ArrowDownRight, ArrowLeft, ArrowRight, ArrowUpRight } from "lucide-react";
-import { budgetProgress, calculateSafeToSpend, summarizeMonth } from "../lib/analytics";
+import { budgetProgress, calculateSafeToSpend, getCurrencyTotals, summarizeMonth } from "../lib/analytics";
 import { categoryName } from "../lib/categories";
-import { expenseBaseAmount, isForeignExpense } from "../lib/currencies";
+import { expenseBaseAmount, isForeignExpense, normalizeCurrencyCode } from "../lib/currencies";
 import { createId } from "../lib/defaults";
 import { formatMonthKey, parseLocalDate } from "../lib/date";
 import { formatMoney, parseMoney } from "../lib/money";
-import type { Budget, ProfileData } from "../lib/types";
+import type { Budget, Expense, ProfileData } from "../lib/types";
 import { EmptyState } from "../components/EmptyState";
 import { MonthPicker } from "../components/MonthPicker";
 import { CategoryChip } from "../components/CategoryChip";
+import { CurrencyBreakdown } from "../components/CurrencyBreakdown";
 
 const CategoryDonut = lazy(() => import("../components/CategoryDonut"));
 
 function formatDetailDate(value: string): string {
   return new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short" }).format(parseLocalDate(value));
+}
+
+function groupExpensesByDate(expenses: Expense[]): Array<{ date: string; expenses: Expense[] }> {
+  const groups = new Map<string, Expense[]>();
+  for (const expense of expenses) {
+    const list = groups.get(expense.date) ?? [];
+    list.push(expense);
+    groups.set(expense.date, list);
+  }
+  return [...groups.entries()].map(([date, groupedExpenses]) => ({ date, expenses: groupedExpenses }));
 }
 
 interface SummaryScreenProps {
@@ -28,6 +39,11 @@ export function SummaryScreen({ data, saveData }: SummaryScreenProps) {
   const [isBudgetEditorOpen, setIsBudgetEditorOpen] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [drilldownCategoryId, setDrilldownCategoryId] = useState<string | null>(null);
+  const [drilldownCurrency, setDrilldownCurrency] = useState<string | null>(null);
+  const monthExpenses = useMemo(
+    () => data.expenses.filter((expense) => expense.date.startsWith(month)),
+    [data.expenses, month]
+  );
   const summary = useMemo(
     () => summarizeMonth(data.expenses, data.categories, month, data.appSettings.currency),
     [data.appSettings.currency, data.categories, data.expenses, month]
@@ -44,15 +60,22 @@ export function SummaryScreen({ data, saveData }: SummaryScreenProps) {
         : [],
     [data.expenses, drilldownCategoryId, month]
   );
-  const drilldownGroups = useMemo(() => {
-    const groups = new Map<string, typeof drilldownExpenses>();
-    for (const expense of drilldownExpenses) {
-      const list = groups.get(expense.date) ?? [];
-      list.push(expense);
-      groups.set(expense.date, list);
-    }
-    return [...groups.entries()].map(([date, expenses]) => ({ date, expenses }));
-  }, [drilldownExpenses]);
+  const drilldownGroups = useMemo(() => groupExpensesByDate(drilldownExpenses), [drilldownExpenses]);
+  const currencyTotals = useMemo(
+    () => getCurrencyTotals(monthExpenses, data.appSettings.currency),
+    [data.appSettings.currency, monthExpenses]
+  );
+  const drilldownCurrencyTotal = currencyTotals.find((total) => total.currency === drilldownCurrency) ?? null;
+  const currencyDrilldownExpenses = useMemo(
+    () =>
+      drilldownCurrency
+        ? monthExpenses
+            .filter((expense) => normalizeCurrencyCode(expense.currency, data.appSettings.currency) === drilldownCurrency)
+            .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
+        : [],
+    [data.appSettings.currency, drilldownCurrency, monthExpenses]
+  );
+  const currencyDrilldownGroups = useMemo(() => groupExpensesByDate(currencyDrilldownExpenses), [currencyDrilldownExpenses]);
   const leftPercent = totalBudget.budget && totalBudget.budget.amount > 0
     ? Math.max(0, Math.round(((totalBudget.budget.amount - totalBudget.spent) / totalBudget.budget.amount) * 100))
     : null;
@@ -82,6 +105,64 @@ export function SummaryScreen({ data, saveData }: SummaryScreenProps) {
     setIsBudgetEditorOpen(false);
   }
 
+  if (drilldownCurrency) {
+    const isForeignCurrency = normalizeCurrencyCode(drilldownCurrency) !== normalizeCurrencyCode(data.appSettings.currency);
+    return (
+      <div className="summary-screen">
+        <section className="hero-panel app-metric-hero summary-hero category-detail-hero">
+          <button className="secondary-button back-button" type="button" onClick={() => setDrilldownCurrency(null)}>
+            <ArrowLeft size={17} />
+            Back
+          </button>
+          <div>
+            <p className="eyebrow">Currency</p>
+            <h2>{drilldownCurrency}</h2>
+            <span className="muted">Total: {formatMoney(drilldownCurrencyTotal?.amount ?? 0, drilldownCurrency)}</span>
+            {isForeignCurrency && (
+              <span className="muted category-detail-context">
+                ≈ {formatMoney(drilldownCurrencyTotal?.baseAmount ?? 0, data.appSettings.currency)} for reporting
+              </span>
+            )}
+          </div>
+        </section>
+
+        <section className="panel category-detail-panel">
+          <div className="section-heading compact-heading category-detail-heading">
+            <p className="eyebrow">Entries</p>
+            <span className="muted small">{currencyDrilldownExpenses.length} total</span>
+          </div>
+          {currencyDrilldownExpenses.length === 0 ? (
+            <EmptyState title="No entries" body="No spending found in this currency for this month." />
+          ) : (
+            <div className="category-detail-list">
+              {currencyDrilldownGroups.map((group) => (
+                <section className="category-date-group" key={group.date}>
+                  <h3>{formatDetailDate(group.date)}</h3>
+                  {group.expenses.map((expense) => (
+                    <article className="category-detail-row" key={expense.id}>
+                      <div>
+                        <strong>{expense.title || categoryName(data.categories, expense.categoryId)}</strong>
+                        <span>
+                          {categoryName(data.categories, expense.categoryId)}
+                          {expense.paymentMethod ? ` · ${expense.paymentMethod}` : ""}
+                        </span>
+                        {expense.remark && <span>Remark: {expense.remark}</span>}
+                      </div>
+                      <span className="category-detail-amount">
+                        <strong>{formatMoney(expense.amount, expense.currency || data.appSettings.currency)}</strong>
+                        {isForeignExpense(expense, data.appSettings.currency) && <small>≈ {formatMoney(expenseBaseAmount(expense), data.appSettings.currency)}</small>}
+                      </span>
+                    </article>
+                  ))}
+                </section>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    );
+  }
+
   if (drilldownCategoryId) {
     const title = drilldownCategory?.name ?? categoryName(data.categories, drilldownCategoryId);
     const total = drilldownCategory?.total ?? drilldownExpenses.reduce((sum, expense) => sum + expenseBaseAmount(expense), 0);
@@ -96,6 +177,7 @@ export function SummaryScreen({ data, saveData }: SummaryScreenProps) {
             <p className="eyebrow">Category</p>
             <h2>{title}</h2>
             <span className="muted">Total: {formatMoney(total, data.appSettings.currency)}</span>
+            <CurrencyBreakdown expenses={drilldownExpenses} baseCurrency={data.appSettings.currency} label="Paid in" />
           </div>
         </section>
 
@@ -140,6 +222,11 @@ export function SummaryScreen({ data, saveData }: SummaryScreenProps) {
         <div>
           <p className="eyebrow">Summary</p>
           <h2>{formatMoney(summary.total, data.appSettings.currency)}</h2>
+          <CurrencyBreakdown
+            expenses={monthExpenses}
+            baseCurrency={data.appSettings.currency}
+            onSelect={(currency) => setDrilldownCurrency(currency)}
+          />
           {summary.monthOverMonthDelta !== null && (
             <span className={summary.monthOverMonthDelta > 0 ? "month-comparison up" : summary.monthOverMonthDelta < 0 ? "month-comparison down" : "month-comparison flat"}>
               {summary.monthOverMonthDelta > 0 ? <ArrowUpRight size={15} /> : summary.monthOverMonthDelta < 0 ? <ArrowDownRight size={15} /> : <ArrowRight size={15} />}
