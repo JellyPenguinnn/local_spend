@@ -66,4 +66,4 @@ Recurring rules store only their original amount and currency; setup does not sh
 
 LocalSpend keeps a single main-currency total because budgets, category percentages, month comparisons, and calendar intensity need one comparable unit. It does not offer a global display toggle that could make totals change meaning from screen to screen.
 
-When a day or month contains foreign spending, the total is followed by a compact native-currency breakdown. Expense rows keep the paid amount primary and the saved main-currency equivalent secondary. Summary breakdown values are actionable and open a monthly currency-specific entry list. This makes travel spending retrievable without revaluing history or mixing incomparable native amounts into one total.
+When a day or month contains foreign spending, the total is followed by a compact `By currency` breakdown. Expense rows keep the paid amount primary and the saved main-currency equivalent secondary. Summary breakdown values are actionable and open a monthly currency-specific entry list. This makes travel spending retrievable without revaluing history or mixing incomparable native amounts into one total.

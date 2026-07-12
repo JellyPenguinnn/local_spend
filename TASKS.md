@@ -75,6 +75,7 @@
 - Kept foreign-currency Recurring setup focused on amount and currency, then moved the automatic base-currency preview, dated-rate label, and confirmation to the actual due reminder on Today.
 - Added cadence-rate regression coverage so each foreign recurring occurrence saves its own latest available dated conversion without revaluing earlier months.
 - Clarified mixed-currency review: Today, Calendar, selected days, category details, and Summary now reveal original-currency totals when relevant; Summary currency totals open a focused monthly entry history while reporting totals remain stable in the main currency.
+- Standardized the mixed-currency context as `By currency` everywhere and completed a market-pattern audit confirming the single-total plus native-breakdown model for occasional travel spending.
 
 ## Follow-Up Polish
 

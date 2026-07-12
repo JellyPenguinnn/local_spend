@@ -216,7 +216,7 @@ export function TodayScreen({ profileId, data, saveData, upsertExpense, deleteEx
         <div>
           <p className="eyebrow">Today</p>
           <h2>{formatMoney(todayTotal, data.appSettings.currency)}</h2>
-          <CurrencyBreakdown expenses={todayExpenses} baseCurrency={data.appSettings.currency} label="Paid in" />
+          <CurrencyBreakdown expenses={todayExpenses} baseCurrency={data.appSettings.currency} />
         </div>
         <div className="hero-side-stack">
           <div className="hero-meta-pill" aria-label={`Today is ${todayLabel}`}>

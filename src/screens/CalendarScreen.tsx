@@ -159,7 +159,7 @@ export function CalendarScreen({ profileId, data, upsertExpense, deleteExpense, 
             </div>
           )}
           {!isAdding && !editingExpense && (
-            <CurrencyBreakdown expenses={selectedExpenses} baseCurrency={data.appSettings.currency} label="Paid in" />
+            <CurrencyBreakdown expenses={selectedExpenses} baseCurrency={data.appSettings.currency} />
           )}
           {(isAdding || editingExpense) && (
             <>

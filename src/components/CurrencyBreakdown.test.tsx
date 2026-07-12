@@ -45,6 +45,7 @@ describe("CurrencyBreakdown", () => {
       />
     );
 
+    expect(screen.getByText("By currency")).toBeInTheDocument();
     expect(screen.getByText("SGD 10.00")).toBeInTheDocument();
     expect(screen.getByText("MYR 30.00")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Review 1 MYR entry" }));

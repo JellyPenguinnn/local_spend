@@ -177,7 +177,7 @@ export function SummaryScreen({ data, saveData }: SummaryScreenProps) {
             <p className="eyebrow">Category</p>
             <h2>{title}</h2>
             <span className="muted">Total: {formatMoney(total, data.appSettings.currency)}</span>
-            <CurrencyBreakdown expenses={drilldownExpenses} baseCurrency={data.appSettings.currency} label="Paid in" />
+            <CurrencyBreakdown expenses={drilldownExpenses} baseCurrency={data.appSettings.currency} />
           </div>
         </section>
 
