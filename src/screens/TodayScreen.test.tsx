@@ -320,9 +320,10 @@ describe("TodayScreen entry flow", () => {
     expect(screen.getByRole("button", { name: "Matched previous entry Transport · PayNow" })).toBeInTheDocument();
   });
 
-  it("makes an exact duplicate deliberate without blocking legitimate repeats", () => {
+  it("requires a second deliberate save for an exact duplicate", async () => {
     const data = createDefaultProfileData();
     const today = formatLocalIsoDate();
+    const upsertExpense = vi.fn().mockResolvedValue(true);
     data.expenses = [
       {
         id: "exp_same",
@@ -347,7 +348,7 @@ describe("TodayScreen entry flow", () => {
         profileId="profile_duplicate"
         data={data}
         saveData={vi.fn().mockResolvedValue(true)}
-        upsertExpense={vi.fn().mockResolvedValue(true)}
+        upsertExpense={upsertExpense}
         deleteExpense={vi.fn().mockResolvedValue(true)}
         secrets={{ getSecret: vi.fn().mockResolvedValue(null) }}
       />
@@ -357,7 +358,53 @@ describe("TodayScreen entry flow", () => {
     fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "2.20" } });
     fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Yakun" } });
 
-    expect(screen.getByText("The same amount and description are already recorded for this date.")).toBeInTheDocument();
+    expect(screen.queryByText(/Possible duplicate/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(upsertExpense).not.toHaveBeenCalled();
+    expect(screen.getByText("Possible duplicate: the same amount and description are already recorded for this date.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save anyway" }));
+    await waitFor(() => expect(upsertExpense).toHaveBeenCalledTimes(1));
+  });
+
+  it("explains a possible duplicate clearly when description is blank", () => {
+    const data = createDefaultProfileData();
+    const today = formatLocalIsoDate();
+    data.expenses = [
+      {
+        id: "exp_blank",
+        amount: 5,
+        currency: "SGD",
+        baseAmount: 5,
+        baseCurrency: "SGD",
+        exchangeRate: 1,
+        exchangeRateDate: today,
+        exchangeRateSource: "base",
+        date: today,
+        categoryId: "cat_food_drinks",
+        title: null,
+        remark: null,
+        paymentMethod: "PayNow",
+        createdAt: `${today}T08:00:00.000Z`,
+        updatedAt: `${today}T08:00:00.000Z`
+      }
+    ];
+    render(
+      <TodayScreen
+        profileId="profile_blank_duplicate"
+        data={data}
+        saveData={vi.fn().mockResolvedValue(true)}
+        upsertExpense={vi.fn().mockResolvedValue(true)}
+        deleteExpense={vi.fn().mockResolvedValue(true)}
+        secrets={{ getSecret: vi.fn().mockResolvedValue(null) }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(screen.getByText("Possible duplicate: the same amount is already recorded for this date.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save anyway" })).toBeInTheDocument();
   });
 });

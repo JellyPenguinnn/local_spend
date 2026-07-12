@@ -2752,6 +2752,12 @@ button.currency-breakdown-chip.interactive:active {
   font-size: 1.02rem;
 }
 
+.guide-today-shot > small {
+  color: var(--muted);
+  font-size: 0.45rem;
+  font-weight: 720;
+}
+
 .guide-today-shot > i {
   position: absolute;
   right: 0.4rem;
@@ -2773,6 +2779,14 @@ button.currency-breakdown-chip.interactive:active {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   align-content: center;
   gap: 0.22rem;
+  padding-top: 0.78rem;
+}
+
+.guide-calendar-search {
+  position: absolute;
+  top: 0.36rem;
+  right: 0.42rem;
+  color: var(--accent);
 }
 
 .guide-calendar-shot > i {
@@ -2809,7 +2823,7 @@ button.currency-breakdown-chip.interactive:active {
   box-shadow: inset 0 0 0 10px var(--surface);
 }
 
-.guide-summary-shot > span:last-child {
+.guide-category-line {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -2819,16 +2833,26 @@ button.currency-breakdown-chip.interactive:active {
   font-size: 0.48rem;
 }
 
-.guide-summary-shot > span:last-child > i {
+.guide-category-line > i {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: var(--accent);
 }
 
-.guide-summary-shot > span:last-child > strong {
+.guide-category-line > strong {
   color: var(--text);
   font-size: 0.52rem;
+}
+
+.guide-currency-line {
+  position: absolute;
+  right: 0.42rem;
+  bottom: 0.36rem;
+  color: var(--muted);
+  font-size: 0.43rem;
+  font-style: normal;
+  font-weight: 750;
 }
 
 .guide-utility-list {

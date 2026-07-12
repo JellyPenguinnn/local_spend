@@ -74,6 +74,7 @@ export function ExpenseForm({
   const [error, setError] = useState("");
   const [didSave, setDidSave] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDuplicateConfirmationVisible, setIsDuplicateConfirmationVisible] = useState(false);
   const [isRemarkOpen, setIsRemarkOpen] = useState(Boolean(editingExpense?.remark || initialDraft?.remark));
   const [categoryNeedsReview, setCategoryNeedsReview] = useState(initialCategoryNeedsReview);
   const [rateState, setRateState] = useState<{ rate: number; date: string; source: ExchangeRateSource } | null>(null);
@@ -144,6 +145,10 @@ export function ExpenseForm({
   useEffect(() => {
     setCategoryNeedsReview(initialCategoryNeedsReview);
   }, [initialCategoryNeedsReview, initialDraft]);
+
+  useEffect(() => {
+    if (!duplicate) setIsDuplicateConfirmationVisible(false);
+  }, [duplicate]);
 
   useEffect(() => {
     if (draftStorageKey && !didSave) {
@@ -268,6 +273,10 @@ export function ExpenseForm({
       return;
     }
     const exchangeRate = isForeignCurrency ? parsedBaseAmount / parsedAmount : 1;
+    if (duplicate && !editingExpense && !isDuplicateConfirmationVisible) {
+      setIsDuplicateConfirmationVisible(true);
+      return;
+    }
     const timestamp = nowIso();
     const expense: Expense = {
       id: editingExpense?.id ?? createId("exp"),
@@ -330,7 +339,6 @@ export function ExpenseForm({
         <div className="form-title-row">
           <div>
             <h3>{editingExpense ? "Edit expense" : "Add expense"}</h3>
-            {duplicate && <p className="form-note warning">The same amount and description are already recorded for this date.</p>}
           </div>
           {editingExpense && (
             <button className="icon-button" type="button" onClick={onCancelEdit} aria-label="Cancel editing" title="Cancel editing">
@@ -339,7 +347,6 @@ export function ExpenseForm({
           )}
         </div>
       )}
-      {hideTitleRow && duplicate && <p className="form-note warning">The same amount and description are already recorded for this date.</p>}
       <div className="expense-grid">
         <div className="amount-field">
           <span className="amount-field-label">Amount</span>
@@ -455,11 +462,24 @@ export function ExpenseForm({
           </button>
         )}
       </div>
+      {isDuplicateConfirmationVisible && duplicate && (
+        <p className="form-note warning" role="status">
+          {draft.title.trim()
+            ? "Possible duplicate: the same amount and description are already recorded for this date."
+            : "Possible duplicate: the same amount is already recorded for this date."}
+        </p>
+      )}
       {error && <p className="form-note danger" role="alert">{error}</p>}
       <p className="sr-only" aria-live="polite">{didSave ? "Expense saved." : isSaving ? "Saving expense." : ""}</p>
       <button className={didSave ? "primary-button save-button saved" : "primary-button save-button"} type="submit" disabled={didSave || isSaving}>
         <Check size={17} />
-        {didSave ? "Saved" : isSaving ? "Saving…" : duplicate && !editingExpense ? "Save anyway" : saveLabel ?? (editingExpense ? "Save changes" : "Save expense")}
+        {didSave
+          ? "Saved"
+          : isSaving
+            ? "Saving…"
+            : isDuplicateConfirmationVisible && duplicate && !editingExpense
+              ? "Save anyway"
+              : saveLabel ?? (editingExpense ? "Save changes" : "Save expense")}
       </button>
     </form>
   );

@@ -200,6 +200,8 @@ describe("Settings organization", () => {
     expect(screen.getByText("Record")).toBeInTheDocument();
     expect(screen.getByText("Review")).toBeInTheDocument();
     expect(screen.getByText("Understand")).toBeInTheDocument();
+    expect(screen.getByText("Multiple currencies")).toBeInTheDocument();
+    expect(screen.getByText("Search spending")).toBeInTheDocument();
     expect(screen.getByText("Your data")).toBeInTheDocument();
   });
 

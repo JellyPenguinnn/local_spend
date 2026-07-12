@@ -76,6 +76,7 @@
 - Added cadence-rate regression coverage so each foreign recurring occurrence saves its own latest available dated conversion without revaluing earlier months.
 - Clarified mixed-currency review: Today, Calendar, selected days, category details, and Summary now reveal original-currency totals when relevant; Summary currency totals open a focused monthly entry history while reporting totals remain stable in the main currency.
 - Standardized the mixed-currency context as `By currency` everywhere and completed a market-pattern audit confirming the single-total plus native-breakdown model for occasional travel spending.
+- Reworked exact-duplicate saving into a visible two-step confirmation, clarified blank-description duplicates, and refreshed the Quick guide with mixed-currency review, Summary drill-down, and Calendar search.
 
 ## Follow-Up Polish
 
