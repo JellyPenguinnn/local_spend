@@ -1,5 +1,5 @@
 import { type ChangeEvent, type CSSProperties, useState } from "react";
-import { BookOpen, CalendarDays, Check, ChevronDown, Coins, Download, Lock, Pencil, Plus, Repeat2, RotateCcw, Search, ShieldCheck, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
+import { BookOpen, CalendarDays, Check, ChevronDown, Coins, Download, Lock, Pencil, PiggyBank, Plus, Repeat2, RotateCcw, Search, ShieldCheck, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
 import { CategoryChip } from "../components/CategoryChip";
 import { FormBackAction } from "../components/FormBackAction";
 import { MAX_BACKUP_FILE_BYTES, createBackup, restoreBackup, summarizeProfileData, type ProfileDataSummary } from "../lib/backup";
@@ -1242,7 +1242,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
               <span className="help-card-icon" aria-hidden="true"><BookOpen size={19} /></span>
               <span className="help-card-copy">
                 <strong>Quick guide</strong>
-                <small>The everyday LocalSpend flow</small>
+                <small>Record, review, and understand</small>
               </span>
               <ChevronDown className="help-card-chevron" size={18} aria-hidden="true" />
             </button>
@@ -1251,35 +1251,48 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
                 <div className="guide-preview-grid">
                   <article className="guide-step">
                     <div className="guide-shot guide-today-shot" aria-hidden="true">
-                      <span>Today</span>
-                      <strong>SGD 12.50</strong>
-                      <small>By currency · MYR 21.00</small>
-                      <i><Plus size={11} /> Add</i>
+                      <div className="guide-mini-hero"><small>Today</small><strong>SGD 12.50</strong></div>
+                      <div className="guide-mini-list-head"><small>Entries</small><span className="guide-mini-action"><Plus size={9} /> Add</span></div>
+                      <div className="guide-mini-entry">
+                        <i aria-hidden="true" />
+                        <span><strong>Yakun</strong></span>
+                        <b>4.20</b>
+                      </div>
                     </div>
-                    <div><strong>Record</strong><p>Tap Add, enter an amount or natural phrase, check the details, then save.</p></div>
+                    <div className="guide-step-copy"><strong>Record</strong><p>Tap Add, enter an amount or phrase, check category and payment, then Save.</p></div>
                   </article>
                   <article className="guide-step">
                     <div className="guide-shot guide-calendar-shot" aria-hidden="true">
-                      <Search className="guide-calendar-search" size={10} />
-                      {[7, 8, 9, 10, 11, 12, 13].map((day) => <i className={day === 12 ? "active" : ""} key={day}>{day}</i>)}
+                      <div className="guide-shot-toolbar"><span>July 2026</span><i><Search size={9} /></i></div>
+                      <div className="guide-calendar-days">
+                        {[10, 11, 12, 13, 14].map((day) => <i className={day === 12 ? "active" : ""} key={day}><b>{day}</b>{day === 12 && <small>12.50</small>}</i>)}
+                      </div>
                     </div>
-                    <div><strong>Review</strong><p>Select a Calendar day to manage its entries, or use Search to find older spending.</p></div>
+                    <div className="guide-step-copy"><strong>Review</strong><p>Choose a Calendar day to add or edit. Search finds older entries.</p></div>
                   </article>
                   <article className="guide-step">
                     <div className="guide-shot guide-summary-shot" aria-hidden="true">
-                      <span className="guide-donut" />
-                      <span className="guide-category-line"><i /> Food & Drinks<strong>58%</strong></span>
-                      <small className="guide-currency-line">By currency · MYR 21.00 ›</small>
+                      <div className="guide-shot-toolbar"><span>Summary</span><small>July</small></div>
+                      <div className="guide-summary-total"><small>Main total</small><strong>SGD 286</strong></div>
+                      <div className="guide-summary-body">
+                        <span className="guide-donut"><strong>58%</strong></span>
+                        <div className="guide-summary-category">
+                          <small>Categories</small>
+                          <span><strong>Food & Drinks</strong></span>
+                        </div>
+                      </div>
+                      <div className="guide-currency-line"><span>By currency</span><strong>View</strong></div>
                     </div>
-                    <div><strong>Understand</strong><p>Summary tracks budgets and categories. Tap a category or By currency value for its entries.</p></div>
+                    <div className="guide-step-copy"><strong>Understand</strong><p>Review monthly totals and categories; open a category or By currency for details.</p></div>
                   </article>
                 </div>
                 <div className="guide-utility-list">
-                  <div><Repeat2 size={17} /><span><strong>Recurring</strong><small>Schedule bills or subscriptions; due reminders appear on Today.</small></span></div>
-                  <div><Coins size={17} /><span><strong>Multiple currencies</strong><small>Record what you paid; totals use the saved dated conversion to your main currency.</small></span></div>
-                  <div><Search size={17} /><span><strong>Search spending</strong><small>Open Search in Calendar to filter by text, category, date, or amount.</small></span></div>
-                  <div><SlidersHorizontal size={17} /><span><strong>Spending & appearance</strong><small>Manage categories, payment methods, colors, and wallpaper.</small></span></div>
-                  <div><ShieldCheck size={17} /><span><strong>Your data</strong><small>Records stay on this device. Back up before moving or clearing it.</small></span></div>
+                  <div><PiggyBank size={17} /><span><strong>Monthly budget</strong><small>Set a limit in Summary to see how much remains.</small></span></div>
+                  <div><Repeat2 size={17} /><span><strong>Recurring</strong><small>Set a schedule once; Today lets you record or discard each due bill.</small></span></div>
+                  <div><Coins size={17} /><span><strong>Multiple currencies</strong><small>Keeps original amounts and dated conversions; review each currency in Summary.</small></span></div>
+                  <div><Search size={17} /><span><strong>Search spending</strong><small>Filter by description, category, date, or amount; open a result to edit.</small></span></div>
+                  <div><SlidersHorizontal size={17} /><span><strong>Customize</strong><small>Manage categories and payments; set mode, color, and wallpaper.</small></span></div>
+                  <div><ShieldCheck size={17} /><span><strong>Private data</strong><small>Stays on this device; Backup all preserves settings, while CSV covers expenses.</small></span></div>
                 </div>
               </div>
             )}
