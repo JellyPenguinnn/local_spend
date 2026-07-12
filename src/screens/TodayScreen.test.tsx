@@ -10,6 +10,49 @@ afterEach(() => {
 });
 
 describe("TodayScreen entry flow", () => {
+  it("keeps mixed-currency detail on the entry without repeating totals in the hero", () => {
+    const data = createDefaultProfileData();
+    const today = formatLocalIsoDate();
+    data.expenses = [
+      {
+        id: "expense_myr_today",
+        amount: 30,
+        currency: "MYR",
+        baseAmount: 9.15,
+        baseCurrency: "SGD",
+        exchangeRate: 0.305,
+        exchangeRateDate: today,
+        exchangeRateSource: "ecb-reference",
+        date: today,
+        categoryId: "cat_transport",
+        title: "Petrol",
+        remark: null,
+        paymentMethod: "PayNow",
+        recurringRuleId: null,
+        recurringOccurrenceDate: null,
+        createdAt: `${today}T04:00:00.000Z`,
+        updatedAt: `${today}T04:00:00.000Z`
+      }
+    ];
+
+    render(
+      <TodayScreen
+        profileId="profile_test"
+        data={data}
+        saveData={vi.fn().mockResolvedValue(true)}
+        upsertExpense={vi.fn().mockResolvedValue(true)}
+        deleteExpense={vi.fn().mockResolvedValue(true)}
+        secrets={{ getSecret: vi.fn().mockResolvedValue(null) }}
+      />
+    );
+
+    expect(screen.getByRole("heading")).toHaveTextContent("SGD 9.15");
+    expect(screen.queryByText("By currency")).not.toBeInTheDocument();
+    const entry = screen.getByText("Petrol").closest("article");
+    expect(entry).toHaveTextContent("MYR 30.00");
+    expect(entry).toHaveTextContent("≈ SGD 9.15");
+  });
+
   it("focuses amount while keeping natural entry visible as an alternative", () => {
     render(
       <TodayScreen

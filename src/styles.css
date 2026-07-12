@@ -715,6 +715,7 @@ h3 {
 .currency-breakdown-chip strong {
   font-size: inherit;
   font-weight: 820;
+  font-variant-numeric: tabular-nums;
 }
 
 button.currency-breakdown-chip.interactive {
@@ -730,10 +731,6 @@ button.currency-breakdown-chip.interactive:focus-visible {
 
 button.currency-breakdown-chip.interactive:active {
   transform: scale(0.98);
-}
-
-.day-panel > .currency-breakdown {
-  margin-bottom: 0.72rem;
 }
 
 .hero-stats {

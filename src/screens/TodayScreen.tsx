@@ -19,7 +19,6 @@ import { EmptyState } from "../components/EmptyState";
 import { ExpenseForm } from "../components/ExpenseForm";
 import { ExpenseList } from "../components/ExpenseList";
 import { CategoryChip } from "../components/CategoryChip";
-import { CurrencyBreakdown } from "../components/CurrencyBreakdown";
 import { FormBackAction } from "../components/FormBackAction";
 import { NaturalQuickAdd } from "../components/NaturalQuickAdd";
 import { normalizeCurrencyCode, resolveReferenceRate, type ExchangeRateQuote, type ExchangeRateStatus } from "../lib/currencies";
@@ -216,7 +215,6 @@ export function TodayScreen({ profileId, data, saveData, upsertExpense, deleteEx
         <div>
           <p className="eyebrow">Today</p>
           <h2>{formatMoney(todayTotal, data.appSettings.currency)}</h2>
-          <CurrencyBreakdown expenses={todayExpenses} baseCurrency={data.appSettings.currency} />
         </div>
         <div className="hero-side-stack">
           <div className="hero-meta-pill" aria-label={`Today is ${todayLabel}`}>
