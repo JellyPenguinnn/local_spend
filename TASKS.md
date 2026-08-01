@@ -79,6 +79,8 @@
 - Reworked exact-duplicate saving into a visible two-step confirmation, clarified blank-description duplicates, and refreshed the Quick guide with mixed-currency review, Summary drill-down, and Calendar search.
 - Simplified the General Quick guide into three compact half-preview workflow rows plus six concise feature notes, including budget, multi-currency, search, recurring, customization, and local data.
 - Reduced mixed-currency repetition by keeping native currency grouping only in Summary, while Today and Calendar retain one reporting total plus original/converted values on foreign entry rows.
+- Streamlined repeat entry after daily use: removed natural-language entry from Today and Calendar, added top-three prefix suggestions from profile-local description history, advanced focus through the form, shortened upcoming reminders to three days, replaced the PWA letter icon, and added separate wallpaper/content opacity controls.
+- Completed the cross-iPhone visual pass: introduced proportional mobile spacing and control layouts, content-aware large totals, ratio-stable calendar cells and forms, an eight-column accent palette, and one clean LocalSpend mark across PWA, iOS, and desktop surfaces.
 
 ## Follow-Up Polish
 

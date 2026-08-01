@@ -1,5 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildMonthlyInsightCards, calculateSafeToSpend, getCategoryTotals, getCurrencyTotals, getUpcomingRecurringItems, hasDuplicateExpense, summarizeMonth, suggestFromExpenseHistory } from "./analytics";
+import {
+  buildMonthlyInsightCards,
+  calculateSafeToSpend,
+  getCategoryTotals,
+  getCurrencyTotals,
+  getUpcomingRecurringItems,
+  hasDuplicateExpense,
+  summarizeMonth,
+  suggestFrequentDescriptions,
+  suggestFromExpenseHistory
+} from "./analytics";
 import { restoreBackup, createBackup, summarizeProfileData } from "./backup";
 import { suggestCategoryLocal } from "./categories";
 import { exportExpensesCsv, findNewImportedExpenses, importExpensesCsv } from "./csv";
@@ -11,7 +21,7 @@ import { createDefaultProfileData, normalizeAccentPalette, normalizeRecurringRul
 import { parseExpenseLocal } from "./ai/localParser";
 import { parseExpenseWithAiOrLocal } from "./ai/providers";
 import { parseJsonObject, validateAiCategoryJson, validateAiExpenseJson, validateAiInsightsJson } from "./ai/schema";
-import { formatCalendarCellAmount, formatMoney, parseMoney, roundMoney } from "./money";
+import { formatCalendarCellAmount, formatMoney, moneyDisplayDensity, parseMoney, roundMoney } from "./money";
 import { mostUsedPaymentMethod } from "./payments";
 import {
   advanceRecurringRulePastRecorded,
@@ -26,7 +36,7 @@ import {
 } from "./recurring";
 import { createRepository } from "./storage/repository";
 import { changedBrowserProfileSections, joinBrowserProfileSections, splitBrowserProfileData } from "./storage/browserSections";
-import { MAX_WALLPAPERS, clampWallpaperOpacity, trimWallpapers } from "./wallpaper";
+import { MAX_WALLPAPERS, clampContentOpacity, clampWallpaperOpacity, trimWallpapers } from "./wallpaper";
 import type { Expense, ProfileData, ProfileMeta, RecurringRule, WallpaperImage } from "./types";
 
 afterEach(() => {
@@ -50,6 +60,12 @@ describe("money formatting and parsing", () => {
     expect(formatCalendarCellAmount(1234.56)).toBe("1235");
     expect(formatCalendarCellAmount(12345.67)).toBe("12.3k");
     expect(formatCalendarCellAmount(1234.56)).not.toContain("SGD");
+  });
+
+  it("sizes large formatted totals by content length", () => {
+    expect(moneyDisplayDensity("SGD 88.88")).toBe("standard");
+    expect(moneyDisplayDensity("SGD 1,245.06")).toBe("compact");
+    expect(moneyDisplayDensity("SGD 1,234,567.89")).toBe("dense");
   });
 });
 
@@ -79,6 +95,29 @@ describe("wallpaper settings", () => {
     expect(trimWallpapers(wallpapers)).toHaveLength(MAX_WALLPAPERS);
     expect(clampWallpaperOpacity(0.01)).toBe(0.12);
     expect(clampWallpaperOpacity(0.7)).toBe(0.55);
+    expect(clampContentOpacity(0.2)).toBe(0.58);
+    expect(clampContentOpacity(1.2)).toBe(1);
+    expect(clampContentOpacity(undefined)).toBe(0.88);
+  });
+});
+
+describe("description suggestions", () => {
+  it("ranks prefix matches by frequency, then recency, and limits the list", () => {
+    const expenses = [
+      { ...makeExpense("cat_transport", "2026-07-01", 10, "Grab"), id: "grab_1", paymentMethod: "PayNow" },
+      { ...makeExpense("cat_transport", "2026-07-02", 11, "grab"), id: "grab_2", paymentMethod: "Apple Pay" },
+      { ...makeExpense("cat_groceries", "2026-07-03", 12, "Giant"), id: "giant_1" },
+      { ...makeExpense("cat_food_drinks", "2026-07-04", 5, "Gong Cha"), id: "gong_1" },
+      { ...makeExpense("cat_food_drinks", "2026-07-05", 6, "Guzman"), id: "guzman_1" }
+    ];
+
+    expect(suggestFrequentDescriptions("g", expenses)).toEqual([
+      expect.objectContaining({ title: "grab", count: 2, categoryId: "cat_transport", paymentMethod: "Apple Pay" }),
+      expect.objectContaining({ title: "Guzman", count: 1 }),
+      expect.objectContaining({ title: "Gong Cha", count: 1 })
+    ]);
+    expect(suggestFrequentDescriptions("gi", expenses).map((item) => item.title)).toEqual(["Giant"]);
+    expect(suggestFrequentDescriptions("", expenses)).toEqual([]);
   });
 });
 
@@ -857,8 +896,9 @@ describe("recurring rules", () => {
     expect(linked[0]).toMatchObject({ recurringRuleId: rule.id, recurringOccurrenceDate: "2026-07-05" });
 
     const nextRule = { ...rule, startDate: "2026-07-15", nextDate: "2026-07-15" };
-    expect(getUpcomingRecurringOccurrences([nextRule], [], "2026-07-10", 7).map((item) => item.date)).toEqual(["2026-07-15"]);
-    expect(getUpcomingRecurringOccurrences([rule], [], "2026-07-10", 7)).toHaveLength(0);
+    expect(getUpcomingRecurringOccurrences([{ ...nextRule, startDate: "2026-07-13", nextDate: "2026-07-13" }], [], "2026-07-10").map((item) => item.date)).toEqual(["2026-07-13"]);
+    expect(getUpcomingRecurringOccurrences([nextRule], [], "2026-07-10")).toHaveLength(0);
+    expect(getUpcomingRecurringOccurrences([rule], [], "2026-07-10")).toHaveLength(0);
   });
 
   it("records only one missing occurrence per recurring rule confirmation", () => {

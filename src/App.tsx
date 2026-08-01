@@ -8,7 +8,7 @@ import { CalendarScreen } from "./screens/CalendarScreen";
 import { SummaryScreen } from "./screens/SummaryScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { ProfileSwitcher } from "./components/ProfileSwitcher";
-import { clampWallpaperOpacity } from "./lib/wallpaper";
+import { clampContentOpacity, clampWallpaperOpacity } from "./lib/wallpaper";
 import { MAX_BACKUP_FILE_BYTES, restoreBackup } from "./lib/backup";
 import { resolveRecurringRuleNextDate } from "./lib/recurring";
 import { MAX_PROFILE_NAME_LENGTH } from "./lib/dataLimits";
@@ -79,6 +79,10 @@ export default function App() {
     document.documentElement.style.setProperty("--user-accent", accentColor);
     document.documentElement.style.setProperty("--wallpaper-image", activeWallpaper ? `url("${activeWallpaper.dataUrl}")` : "none");
     document.documentElement.style.setProperty("--wallpaper-opacity", activeWallpaper ? String(clampWallpaperOpacity(settings?.wallpaperOpacity)) : "0");
+    const contentOpacity = clampContentOpacity(settings?.contentOpacity);
+    document.documentElement.style.setProperty("--content-opacity-soft", `${Math.round(Math.max(0.46, contentOpacity - 0.12) * 100)}%`);
+    document.documentElement.style.setProperty("--content-opacity", `${Math.round(contentOpacity * 100)}%`);
+    document.documentElement.style.setProperty("--content-opacity-strong", `${Math.round(Math.min(1, contentOpacity + 0.08) * 100)}%`);
 
     const themeColorMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
     themeColorMeta?.setAttribute("content", activeWallpaper ? accentColor : theme === "dark" ? "#171917" : "#fafaf7");
@@ -176,7 +180,9 @@ export default function App() {
     <div className="app-shell">
       <header className="topbar">
         <div className="brand">
-          <span className="brand-mark">L</span>
+          <span className="brand-mark" aria-hidden="true">
+            <img src={`${import.meta.env.BASE_URL}localspend-icon.svg`} alt="" />
+          </span>
           <div>
             <strong>LocalSpend</strong>
             <small>Private spending, one profile at a time</small>
@@ -238,7 +244,9 @@ function FirstLaunch({ error, onCreate, onRestore }: { error: string; onCreate: 
     <main className="first-launch">
       <section className="first-card">
         <div className="brand large">
-          <span className="brand-mark">L</span>
+          <span className="brand-mark" aria-hidden="true">
+            <img src={`${import.meta.env.BASE_URL}localspend-icon.svg`} alt="" />
+          </span>
           <div>
             <strong>LocalSpend</strong>
             <small>Local, private, calm.</small>

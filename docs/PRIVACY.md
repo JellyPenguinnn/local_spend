@@ -39,7 +39,7 @@ AI is disabled by default. Manual spending entry, category rules, and monthly co
 
 When AI is enabled:
 
-- Natural language quick add sends only the text the user entered.
+- Natural language quick add is not exposed in the current spending form.
 - Category fallback sends only short title/merchant/remark text.
 - Monthly insights send monthly aggregates only.
 - Data from other profiles is never included.

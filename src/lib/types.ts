@@ -89,6 +89,7 @@ export interface AppSettings {
   wallpapers: WallpaperImage[];
   activeWallpaperId?: string | null;
   wallpaperOpacity: number;
+  contentOpacity: number;
   lastBackupAt?: string | null;
 }
 

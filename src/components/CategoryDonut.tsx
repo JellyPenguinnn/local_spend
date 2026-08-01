@@ -18,7 +18,7 @@ export default function CategoryDonut({ totals, selectedCategoryId, onSelect }: 
           nameKey="name"
           innerRadius="54%"
           outerRadius="78%"
-          paddingAngle={2}
+          paddingAngle={totals.length > 1 ? 2 : 0}
           onClick={(entry: unknown, _index: number, event: MouseEvent<SVGElement>) => {
             event.stopPropagation();
             const categoryId = (entry as Partial<CategoryTotal>).categoryId;

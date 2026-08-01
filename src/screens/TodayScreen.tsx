@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronDown, ChevronUp, Plus } from "lucide-react";
 import { getDailyTotals } from "../lib/analytics";
-import { fallbackCategoryId } from "../lib/categories";
 import { formatLocalIsoDate, parseLocalDate } from "../lib/date";
 import { clearExpenseDraft, expenseDraftKey } from "../lib/drafts";
-import { formatMoney, roundMoney } from "../lib/money";
-import { mostUsedPaymentMethod } from "../lib/payments";
+import { formatMoney, moneyDisplayDensity, roundMoney } from "../lib/money";
 import {
   discardRecurringOccurrence,
   getDueRecurringOccurrences,
@@ -13,14 +11,13 @@ import {
   reconcileRecurringOccurrence,
   recordRecurringOccurrence
 } from "../lib/recurring";
-import { parseExpenseWithAiOrLocal, type AiSecretStore } from "../lib/ai/providers";
-import type { Expense, ExpenseDraft, ProfileData, RecurringCadence } from "../lib/types";
+import type { AiSecretStore } from "../lib/ai/providers";
+import type { Expense, ProfileData, RecurringCadence } from "../lib/types";
 import { EmptyState } from "../components/EmptyState";
 import { ExpenseForm } from "../components/ExpenseForm";
 import { ExpenseList } from "../components/ExpenseList";
 import { CategoryChip } from "../components/CategoryChip";
 import { FormBackAction } from "../components/FormBackAction";
-import { NaturalQuickAdd } from "../components/NaturalQuickAdd";
 import { normalizeCurrencyCode, resolveReferenceRate, type ExchangeRateQuote, type ExchangeRateStatus } from "../lib/currencies";
 
 interface TodayScreenProps {
@@ -50,15 +47,10 @@ function formatDueRateLabel(quote: ExchangeRateQuote, requestedDate: string): st
   return `${source} · ${date}`;
 }
 
-export function TodayScreen({ profileId, data, saveData, upsertExpense, deleteExpense, secrets }: TodayScreenProps) {
+export function TodayScreen({ profileId, data, saveData, upsertExpense, deleteExpense }: TodayScreenProps) {
   const today = formatLocalIsoDate();
   const todayLabel = new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short", year: "numeric" }).format(parseLocalDate(today));
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [quickText, setQuickText] = useState("");
-  const [quickDraft, setQuickDraft] = useState<Partial<ExpenseDraft> | undefined>();
-  const [quickMessage, setQuickMessage] = useState("");
-  const [quickCategoryNeedsReview, setQuickCategoryNeedsReview] = useState(false);
-  const [isParsing, setIsParsing] = useState(false);
   const [isEntryOpen, setIsEntryOpen] = useState(false);
   const [pendingDiscardOccurrenceId, setPendingDiscardOccurrenceId] = useState<string | null>(null);
   const [recordingOccurrenceId, setRecordingOccurrenceId] = useState<string | null>(null);
@@ -70,12 +62,13 @@ export function TodayScreen({ profileId, data, saveData, upsertExpense, deleteEx
     [data.expenses, today]
   );
   const todayTotal = getDailyTotals(todayExpenses)[today] ?? 0;
+  const todayTotalLabel = formatMoney(todayTotal, data.appSettings.currency);
   const dueOccurrences = useMemo(
     () => getDueRecurringOccurrences(data.recurringRules, data.expenses, today),
     [data.expenses, data.recurringRules, today]
   );
   const upcomingOccurrences = useMemo(
-    () => getUpcomingRecurringOccurrences(data.recurringRules, data.expenses, today, 7),
+    () => getUpcomingRecurringOccurrences(data.recurringRules, data.expenses, today, 3),
     [data.expenses, data.recurringRules, today]
   );
   const activeDraftKey = expenseDraftKey(profileId, editingExpense ? `edit.${editingExpense.id}` : `today.${today}`);
@@ -114,37 +107,6 @@ export function TodayScreen({ profileId, data, saveData, upsertExpense, deleteEx
       cancelled = true;
     };
   }, [data.appSettings.currency, data.expenses, dueOccurrences]);
-
-  async function parseQuickAdd() {
-    if (!quickText.trim()) {
-      setQuickMessage("Type a short expense first.");
-      return;
-    }
-    setIsParsing(true);
-    setQuickMessage("");
-    try {
-      const parsed = await parseExpenseWithAiOrLocal(quickText, data.aiSettings, data.categories, secrets, today, data.appSettings.paymentMethods, data.expenses);
-      if (!parsed?.amount) {
-        setQuickMessage("I could not find an amount.");
-        return;
-      }
-      setQuickDraft({
-        amount: parsed.amount,
-        currency: parsed.currency ?? data.appSettings.currency,
-        baseAmount: "",
-        date: today,
-        categoryId: parsed.categoryId ?? fallbackCategoryId(data.categories),
-        title: parsed.title ?? quickText,
-        remark: parsed.source === "ai" ? "AI suggestion" : "",
-        paymentMethod: parsed.paymentMethod ?? mostUsedPaymentMethod(data.expenses, data.appSettings.paymentMethods)
-      });
-      setQuickCategoryNeedsReview(!parsed.categoryId || (parsed.categoryConfidence ?? 0) < 0.72);
-      setIsEntryOpen(true);
-      setQuickMessage(parsed.source === "ai" ? "AI suggestion ready. Check it before saving." : "Draft ready. Check it before saving.");
-    } finally {
-      setIsParsing(false);
-    }
-  }
 
   async function recordBill(ruleId: string, occurrenceDate: string) {
     const occurrenceId = `${ruleId}:${occurrenceDate}`;
@@ -193,19 +155,12 @@ export function TodayScreen({ profileId, data, saveData, upsertExpense, deleteEx
 
   function openEntry(expense?: Expense) {
     setEditingExpense(expense ?? null);
-    setQuickDraft(undefined);
-    setQuickMessage("");
-    setQuickCategoryNeedsReview(false);
     setIsEntryOpen(true);
   }
 
   function closeEntry() {
     clearExpenseDraft(activeDraftKey);
     setEditingExpense(null);
-    setQuickDraft(undefined);
-    setQuickText("");
-    setQuickMessage("");
-    setQuickCategoryNeedsReview(false);
     setIsEntryOpen(false);
   }
 
@@ -214,7 +169,7 @@ export function TodayScreen({ profileId, data, saveData, upsertExpense, deleteEx
       <section className="hero-panel app-metric-hero today-hero">
         <div>
           <p className="eyebrow">Today</p>
-          <h2>{formatMoney(todayTotal, data.appSettings.currency)}</h2>
+          <h2 className={`hero-money ${moneyDisplayDensity(todayTotalLabel)}`}>{todayTotalLabel}</h2>
         </div>
         <div className="hero-side-stack">
           <div className="hero-meta-pill" aria-label={`Today is ${todayLabel}`}>
@@ -314,7 +269,7 @@ export function TodayScreen({ profileId, data, saveData, upsertExpense, deleteEx
           <button className="upcoming-toggle" type="button" onClick={() => setShowUpcoming((value) => !value)} aria-expanded={showUpcoming}>
             <span>
               <strong>Upcoming</strong>
-              <small>Next 7 days · {upcomingOccurrences.length}</small>
+              <small>Next 3 days · {upcomingOccurrences.length}</small>
             </span>
             {showUpcoming ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
           </button>
@@ -348,25 +303,11 @@ export function TodayScreen({ profileId, data, saveData, upsertExpense, deleteEx
             settings={data.appSettings}
             expenses={data.expenses}
             defaultDate={today}
-            initialDraft={quickDraft}
             editingExpense={editingExpense}
             hideDate
             hideTitleRow
             autoFocusAmount
             draftStorageKey={activeDraftKey}
-            initialCategoryNeedsReview={quickCategoryNeedsReview}
-            afterAmount={
-              !editingExpense ? (
-                <NaturalQuickAdd
-                  value={quickText}
-                  message={quickMessage}
-                  isParsing={isParsing}
-                  aiEnabled={data.aiSettings.provider !== "none"}
-                  onChange={setQuickText}
-                  onDraft={() => void parseQuickAdd()}
-                />
-              ) : null
-            }
             saveLabel="Save"
             onCancelEdit={closeEntry}
             onSave={(expense) => upsertExpense(expense)}

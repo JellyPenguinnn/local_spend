@@ -24,6 +24,13 @@ export function formatMoney(amount: number, currency = "SGD"): string {
   }).format(roundMoney(amount));
 }
 
+export function moneyDisplayDensity(formattedAmount: string): "standard" | "compact" | "dense" {
+  const length = [...formattedAmount].length;
+  if (length > 14) return "dense";
+  if (length > 11) return "compact";
+  return "standard";
+}
+
 export function formatCompactMoney(amount: number, currency = "SGD"): string {
   const rounded = roundMoney(amount);
   if (rounded === 0) {

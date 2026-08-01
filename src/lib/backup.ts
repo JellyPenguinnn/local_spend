@@ -13,7 +13,7 @@ import {
 } from "./dataLimits";
 import { isValidLocalIsoDate } from "./date";
 import type { AiProvider, Budget, Category, Expense, ProfileData, ProfileMeta, RecurringCadence, RecurringRule, ThemeKey, WallpaperImage } from "./types";
-import { MAX_WALLPAPERS, clampWallpaperOpacity } from "./wallpaper";
+import { MAX_WALLPAPERS, clampContentOpacity, clampWallpaperOpacity } from "./wallpaper";
 
 export const MAX_BACKUP_FILE_BYTES = 12 * 1024 * 1024;
 
@@ -164,6 +164,7 @@ function normalizeBackupData(raw: Record<string, unknown>, exportedAt: string): 
         wallpapers,
         activeWallpaperId,
         wallpaperOpacity: clampWallpaperOpacity(typeof rawSettings.wallpaperOpacity === "number" ? rawSettings.wallpaperOpacity : undefined),
+        contentOpacity: clampContentOpacity(typeof rawSettings.contentOpacity === "number" ? rawSettings.contentOpacity : undefined),
         lastBackupAt: exportedAt
       },
       aiSettings: {

@@ -60,7 +60,7 @@ export function getUpcomingRecurringOccurrences(
   rules: RecurringRule[],
   expenses: Expense[],
   today: string,
-  windowDays = 7
+  windowDays = 3
 ): RecurringOccurrence[] {
   const endDate = addDays(today, windowDays);
   const overdueRuleIds = new Set(getDueRecurringOccurrences(rules, expenses, today).map((occurrence) => occurrence.ruleId));

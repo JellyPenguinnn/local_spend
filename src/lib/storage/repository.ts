@@ -1,7 +1,7 @@
 import { createDefaultProfileData, createId, normalizeAccentPalette, normalizeRecurringRules, nowIso } from "../defaults";
 import { normalizeCurrencyCode, normalizeEnabledCurrencies, normalizeExpenses } from "../currencies";
 import type { ProfileData, ProfileMeta, ProfilesState, ThemeKey } from "../types";
-import { clampWallpaperOpacity, trimWallpapers } from "../wallpaper";
+import { clampContentOpacity, clampWallpaperOpacity, trimWallpapers } from "../wallpaper";
 import {
   BROWSER_PROFILE_SECTION_NAMES,
   changedBrowserProfileSections,
@@ -437,6 +437,7 @@ function normalizeProfileData(data: Partial<ProfileData>): ProfileData {
       wallpapers,
       activeWallpaperId,
       wallpaperOpacity: clampWallpaperOpacity(data.appSettings?.wallpaperOpacity),
+      contentOpacity: clampContentOpacity(data.appSettings?.contentOpacity),
       lastBackupAt: typeof data.appSettings?.lastBackupAt === "string" ? data.appSettings.lastBackupAt : null
     },
     aiSettings: {

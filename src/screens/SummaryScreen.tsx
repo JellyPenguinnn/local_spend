@@ -5,7 +5,7 @@ import { categoryName } from "../lib/categories";
 import { expenseBaseAmount, isForeignExpense, normalizeCurrencyCode } from "../lib/currencies";
 import { createId } from "../lib/defaults";
 import { formatMonthKey, parseLocalDate } from "../lib/date";
-import { formatMoney, parseMoney } from "../lib/money";
+import { formatMoney, moneyDisplayDensity, parseMoney } from "../lib/money";
 import type { Budget, Expense, ProfileData } from "../lib/types";
 import { EmptyState } from "../components/EmptyState";
 import { MonthPicker } from "../components/MonthPicker";
@@ -80,6 +80,7 @@ export function SummaryScreen({ data, saveData }: SummaryScreenProps) {
     ? Math.max(0, Math.round(((totalBudget.budget.amount - totalBudget.spent) / totalBudget.budget.amount) * 100))
     : null;
   const budgetRemaining = totalBudget.budget ? totalBudget.budget.amount - totalBudget.spent : null;
+  const summaryTotalLabel = formatMoney(summary.total, data.appSettings.currency);
 
   function openBudgetEditor() {
     setBudgetInput(totalBudget.budget ? totalBudget.budget.amount.toFixed(2) : "");
@@ -220,7 +221,7 @@ export function SummaryScreen({ data, saveData }: SummaryScreenProps) {
       <section className="hero-panel app-metric-hero summary-hero">
         <div>
           <p className="eyebrow">Summary</p>
-          <h2>{formatMoney(summary.total, data.appSettings.currency)}</h2>
+          <h2 className={`hero-money ${moneyDisplayDensity(summaryTotalLabel)}`}>{summaryTotalLabel}</h2>
           <CurrencyBreakdown
             expenses={monthExpenses}
             baseCurrency={data.appSettings.currency}

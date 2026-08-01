@@ -51,6 +51,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   wallpapers: [],
   activeWallpaperId: null,
   wallpaperOpacity: 0.34,
+  contentOpacity: 0.88,
   lastBackupAt: null
 };
 

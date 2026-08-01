@@ -3,17 +3,14 @@ import { ArrowLeft, Plus, Search } from "lucide-react";
 import { buildCalendarMonth, formatMonthKey, parseLocalDate } from "../lib/date";
 import { clearExpenseDraft, expenseDraftKey } from "../lib/drafts";
 import { getDailyTotals } from "../lib/analytics";
-import { fallbackCategoryId } from "../lib/categories";
-import { formatCalendarCellAmount, formatMoney } from "../lib/money";
-import { mostUsedPaymentMethod } from "../lib/payments";
-import { parseExpenseWithAiOrLocal, type AiSecretStore } from "../lib/ai/providers";
-import type { Expense, ExpenseDraft, ProfileData } from "../lib/types";
+import { formatCalendarCellAmount, formatMoney, moneyDisplayDensity } from "../lib/money";
+import type { AiSecretStore } from "../lib/ai/providers";
+import type { Expense, ProfileData } from "../lib/types";
 import { EmptyState } from "../components/EmptyState";
 import { ExpenseForm } from "../components/ExpenseForm";
 import { ExpenseList } from "../components/ExpenseList";
 import { FormBackAction } from "../components/FormBackAction";
 import { MonthPicker } from "../components/MonthPicker";
-import { NaturalQuickAdd } from "../components/NaturalQuickAdd";
 import { TransactionSearch } from "../components/TransactionSearch";
 
 interface CalendarScreenProps {
@@ -24,21 +21,17 @@ interface CalendarScreenProps {
   secrets: AiSecretStore;
 }
 
-export function CalendarScreen({ profileId, data, upsertExpense, deleteExpense, secrets }: CalendarScreenProps) {
+export function CalendarScreen({ profileId, data, upsertExpense, deleteExpense }: CalendarScreenProps) {
   const [month, setMonth] = useState(formatMonthKey());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [isAdding, setIsAdding] = useState(false);
-  const [quickText, setQuickText] = useState("");
-  const [quickDraft, setQuickDraft] = useState<Partial<ExpenseDraft> | undefined>();
-  const [quickMessage, setQuickMessage] = useState("");
-  const [quickCategoryNeedsReview, setQuickCategoryNeedsReview] = useState(false);
-  const [isParsing, setIsParsing] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const monthExpenses = useMemo(() => data.expenses.filter((expense) => expense.date.startsWith(month)), [data.expenses, month]);
   const dailyTotals = useMemo(() => getDailyTotals(monthExpenses), [monthExpenses]);
   const maxDaily = Math.max(1, ...Object.values(dailyTotals));
   const monthTotal = Object.values(dailyTotals).reduce((sum, value) => sum + value, 0);
+  const monthTotalLabel = formatMoney(monthTotal, data.appSettings.currency);
   const selectedExpenses = selectedDate
     ? data.expenses.filter((expense) => expense.date === selectedDate).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     : [];
@@ -55,46 +48,6 @@ export function CalendarScreen({ profileId, data, upsertExpense, deleteExpense, 
     setSelectedDate(null);
     setEditingExpense(null);
     setIsAdding(false);
-    clearDraft();
-  }
-
-  function clearDraft() {
-    setQuickText("");
-    setQuickDraft(undefined);
-    setQuickMessage("");
-    setQuickCategoryNeedsReview(false);
-    setIsParsing(false);
-  }
-
-  async function parseQuickAddForSelectedDay() {
-    if (!selectedDate) return;
-    if (!quickText.trim()) {
-      setQuickMessage("Type a short expense first.");
-      return;
-    }
-    setIsParsing(true);
-    setQuickMessage("");
-    try {
-      const parsed = await parseExpenseWithAiOrLocal(quickText, data.aiSettings, data.categories, secrets, selectedDate, data.appSettings.paymentMethods, data.expenses);
-      if (!parsed?.amount) {
-        setQuickMessage("I could not find an amount.");
-        return;
-      }
-      setQuickDraft({
-        amount: parsed.amount,
-        currency: parsed.currency ?? data.appSettings.currency,
-        baseAmount: "",
-        date: selectedDate,
-        categoryId: parsed.categoryId ?? fallbackCategoryId(data.categories),
-        title: parsed.title ?? quickText,
-        remark: parsed.source === "ai" ? "AI suggestion" : "",
-        paymentMethod: parsed.paymentMethod ?? mostUsedPaymentMethod(data.expenses, data.appSettings.paymentMethods)
-      });
-      setQuickCategoryNeedsReview(!parsed.categoryId || (parsed.categoryConfidence ?? 0) < 0.72);
-      setQuickMessage(parsed.source === "ai" ? "AI suggestion ready. Check it before saving." : "Draft ready. Check it before saving.");
-    } finally {
-      setIsParsing(false);
-    }
   }
 
   if (isSearching) {
@@ -108,7 +61,6 @@ export function CalendarScreen({ profileId, data, upsertExpense, deleteExpense, 
           setEditingExpense(expense);
           setIsAdding(false);
           setIsSearching(false);
-          clearDraft();
         }}
         onDelete={(expenseId) => void deleteExpense(expenseId)}
       />
@@ -142,7 +94,6 @@ export function CalendarScreen({ profileId, data, upsertExpense, deleteExpense, 
               onClick={() => {
                 setIsAdding(true);
                 setEditingExpense(null);
-                clearDraft();
               }}
             >
               <Plus size={17} />
@@ -164,7 +115,6 @@ export function CalendarScreen({ profileId, data, upsertExpense, deleteExpense, 
                   clearExpenseDraft(activeDraftKey);
                   setEditingExpense(null);
                   setIsAdding(false);
-                  clearDraft();
                 }}
               />
               <ExpenseForm
@@ -173,36 +123,20 @@ export function CalendarScreen({ profileId, data, upsertExpense, deleteExpense, 
                 settings={data.appSettings}
                 expenses={data.expenses}
                 defaultDate={selectedDate}
-                initialDraft={quickDraft}
                 editingExpense={editingExpense}
                 hideDate={!editingExpense}
                 hideTitleRow
                 autoFocusAmount={!editingExpense}
                 draftStorageKey={activeDraftKey}
-                initialCategoryNeedsReview={quickCategoryNeedsReview}
-                afterAmount={
-                  !editingExpense ? (
-                    <NaturalQuickAdd
-                      value={quickText}
-                      message={quickMessage}
-                      isParsing={isParsing}
-                      aiEnabled={data.aiSettings.provider !== "none"}
-                      onChange={setQuickText}
-                      onDraft={() => void parseQuickAddForSelectedDay()}
-                    />
-                  ) : null
-                }
                 saveLabel="Save"
                 onCancelEdit={() => {
                   setEditingExpense(null);
                   setIsAdding(false);
-                  clearDraft();
                 }}
                 onSave={(expense) => upsertExpense(expense)}
                 onSaved={() => {
                   setEditingExpense(null);
                   setIsAdding(false);
-                  clearDraft();
                 }}
               />
             </>
@@ -218,7 +152,6 @@ export function CalendarScreen({ profileId, data, upsertExpense, deleteExpense, 
               onEdit={(expense) => {
                 setEditingExpense(expense);
                 setIsAdding(false);
-                clearDraft();
               }}
               onDelete={(id) => void deleteExpense(id)}
             />
@@ -233,7 +166,7 @@ export function CalendarScreen({ profileId, data, upsertExpense, deleteExpense, 
       <section className="hero-panel app-metric-hero calendar-hero">
         <div>
           <p className="eyebrow">Calendar</p>
-          <h2>{formatMoney(monthTotal, data.appSettings.currency)}</h2>
+          <h2 className={`hero-money ${moneyDisplayDensity(monthTotalLabel)}`}>{monthTotalLabel}</h2>
         </div>
         <MonthPicker month={month} onChange={setMonth} />
       </section>
@@ -274,7 +207,6 @@ export function CalendarScreen({ profileId, data, upsertExpense, deleteExpense, 
                     setSelectedDate(cell.date);
                     setEditingExpense(null);
                     setIsAdding(false);
-                    clearDraft();
                   }}
                   style={{ "--intensity": intensity } as CSSProperties}
                 >

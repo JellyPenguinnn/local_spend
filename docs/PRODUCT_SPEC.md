@@ -43,7 +43,7 @@
 
 ## AI Workflows
 
-- Natural language quick add creates a draft expense for user confirmation.
+- Natural language quick add is disabled in the v1 spending form in favor of a faster predictable manual flow.
 - Smart categorization uses local keyword rules first and AI only when enabled and low confidence.
 - Monthly AI insight sends category totals, total spend, previous month delta, and high-spend days only.
 - Provider modes: none, Ollama local, Gemini, Groq, OpenRouter.
@@ -57,7 +57,7 @@
 
 ## Settings Organization
 
-- Appearance contains currencies, light/dark mode, accent colors, and wallpaper.
+- Appearance contains currencies, light/dark mode, accent colors, wallpaper visibility, and content-box opacity.
 - Recurring manages scheduled bills and subscriptions.
 - Spending contains categories and payment methods in one compact view.
 - General contains an optional visual quick guide and profile-scoped data controls.

@@ -21,7 +21,15 @@ import { compareIsoDates, formatLocalIsoDate, parseLocalDate } from "../lib/date
 import { createId, MAX_ACCENT_PALETTE_COLORS, normalizeAccentPalette, nowIso } from "../lib/defaults";
 import { formatMoney, parseMoney } from "../lib/money";
 import { advanceRecurringRulePastRecorded, hasRecordedRecurringExpense, linkRecordedRecurringExpenses, resolveRecurringRuleNextDate } from "../lib/recurring";
-import { DEFAULT_WALLPAPER_OPACITY, MAX_WALLPAPERS, clampWallpaperOpacity, createWallpaperFromFile, formatBytes, trimWallpapers } from "../lib/wallpaper";
+import {
+  DEFAULT_WALLPAPER_OPACITY,
+  MAX_WALLPAPERS,
+  clampContentOpacity,
+  clampWallpaperOpacity,
+  createWallpaperFromFile,
+  formatBytes,
+  trimWallpapers
+} from "../lib/wallpaper";
 import type { Category, ProfileData, ProfileMeta, RecurringCadence, RecurringRule } from "../lib/types";
 import type { LocalSpendRepository } from "../lib/storage/repository";
 
@@ -870,17 +878,30 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
               </div>
             </div>
             {data.appSettings.activeWallpaperId && (
-              <label className="wallpaper-opacity-control">
-                <span>Visibility</span>
-                <input
-                  type="range"
-                  min="0.12"
-                  max="0.55"
-                  step="0.01"
-                  value={clampWallpaperOpacity(data.appSettings.wallpaperOpacity)}
-                  onChange={(event) => void updateSettings({ wallpaperOpacity: Number(event.target.value) })}
-                />
-              </label>
+              <div className="wallpaper-visibility-controls">
+                <label className="wallpaper-opacity-control">
+                  <span>Wallpaper visibility</span>
+                  <input
+                    type="range"
+                    min="0.12"
+                    max="0.55"
+                    step="0.01"
+                    value={clampWallpaperOpacity(data.appSettings.wallpaperOpacity)}
+                    onChange={(event) => void updateSettings({ wallpaperOpacity: Number(event.target.value) })}
+                  />
+                </label>
+                <label className="wallpaper-opacity-control">
+                  <span>Content boxes</span>
+                  <input
+                    type="range"
+                    min="0.58"
+                    max="1"
+                    step="0.01"
+                    value={clampContentOpacity(data.appSettings.contentOpacity)}
+                    onChange={(event) => void updateSettings({ contentOpacity: Number(event.target.value) })}
+                  />
+                </label>
+              </div>
             )}
             <div className="wallpaper-actions">
               <label className={data.appSettings.wallpapers.length >= MAX_WALLPAPERS ? "file-button wallpaper-import disabled" : "file-button wallpaper-import"}>
@@ -1259,7 +1280,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
                         <b>4.20</b>
                       </div>
                     </div>
-                    <div className="guide-step-copy"><strong>Record</strong><p>Tap Add, enter an amount or phrase, check category and payment, then Save.</p></div>
+                    <div className="guide-step-copy"><strong>Record</strong><p>Tap Add, enter the amount, choose category and payment, then Save.</p></div>
                   </article>
                   <article className="guide-step">
                     <div className="guide-shot guide-calendar-shot" aria-hidden="true">

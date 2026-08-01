@@ -53,7 +53,7 @@ describe("TodayScreen entry flow", () => {
     expect(entry).toHaveTextContent("≈ SGD 9.15");
   });
 
-  it("focuses amount while keeping natural entry visible as an alternative", () => {
+  it("focuses amount and advances through the manual fields", () => {
     render(
       <TodayScreen
         profileId="profile_test"
@@ -71,10 +71,19 @@ describe("TodayScreen entry flow", () => {
     expect(screen.getByRole("group", { name: "Amount and currency" })).toContainElement(screen.getByLabelText("Spending currency"));
     expect(screen.getByRole("group", { name: "Amount and currency" })).toContainElement(screen.getByLabelText("Amount"));
     expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Or enter naturally")).toHaveAttribute("placeholder", "kopi 2.20 yakun paynow");
-    expect(screen.getByRole("button", { name: "Fill" })).toBeInTheDocument();
+    expect(screen.queryByText("Or enter naturally")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Category")).toHaveValue("cat_food_drinks");
     expect(screen.getByLabelText("Payment")).toHaveValue("PayNow");
+
+    fireEvent.keyDown(screen.getByLabelText("Amount"), { key: "Enter" });
+    expect(screen.getByLabelText("Category")).toHaveFocus();
+    fireEvent.change(screen.getByLabelText("Category"), { target: { value: "cat_transport" } });
+    expect(screen.getByLabelText("Payment")).toHaveFocus();
+    fireEvent.change(screen.getByLabelText("Payment"), { target: { value: "Apple Pay" } });
+    expect(screen.getByLabelText("Description")).toHaveFocus();
+    fireEvent.keyDown(screen.getByLabelText("Description"), { key: "Enter" });
+    expect(screen.getByRole("button", { name: "Save" })).toHaveFocus();
+
     expect(screen.getByRole("button", { name: "Add remark" })).toBeInTheDocument();
     expect(screen.queryByLabelText("Remark")).not.toBeInTheDocument();
 
@@ -326,7 +335,7 @@ describe("TodayScreen entry flow", () => {
     expect(screen.getByLabelText("Description")).toHaveValue("Kopi");
   });
 
-  it("surfaces a previous merchant match inside the focused form", () => {
+  it("offers matching descriptions and restores the remembered fields", () => {
     const data = createDefaultProfileData();
     data.expenses = [
       {
@@ -359,8 +368,13 @@ describe("TodayScreen entry flow", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
-    fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Grab" } });
-    expect(screen.getByRole("button", { name: "Matched previous entry Transport · PayNow" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Description"), { target: { value: "G" } });
+    fireEvent.click(screen.getByRole("option", { name: "Grab" }));
+    expect(screen.getByLabelText("Description")).toHaveValue("Grab");
+    expect(screen.getByLabelText("Category")).toHaveValue("cat_transport");
+    expect(screen.getByLabelText("Payment")).toHaveValue("PayNow");
+    expect(screen.getByRole("button", { name: "Save" })).toHaveFocus();
+    expect(screen.queryByRole("listbox", { name: "Frequent descriptions" })).not.toBeInTheDocument();
   });
 
   it("requires a second deliberate save for an exact duplicate", async () => {

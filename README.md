@@ -12,7 +12,7 @@ LocalSpend is a local-first spending tracker for fast daily expense entry, month
 ## Features
 
 - **Today**: see today's total, add spending quickly, edit or delete entries, and record due bills.
-- **Natural quick add**: type spending naturally, such as `yakun 5.70 paynow`, then confirm the draft before saving.
+- **Fast manual entry**: move from amount to category, payment, and description with frequent description suggestions from your own history.
 - **Mixed currencies**: keep the original amount, such as `MYR 18.00`, while budgets and summaries use a stable SGD equivalent.
 - **Calendar**: review monthly daily totals, select a day, and add or edit entries for that date.
 - **Summary**: view monthly total, budget progress, category donut chart, and category-level spending details.
@@ -31,7 +31,7 @@ LocalSpend is intentionally not a SaaS product.
 - The PWA stores data in that browser/PWA install. Each friend's phone has separate local data.
 - The macOS Tauri app stores each local profile in its own SQLite database.
 - Imported wallpapers are stored locally with the active profile.
-- Cloud AI provider settings are not exposed in the simplified v1 UI. Manual entry and local parsing work without cloud AI.
+- Cloud AI provider settings are not exposed in the simplified v1 UI. Manual entry works entirely without cloud AI.
 
 See [docs/PRIVACY.md](docs/PRIVACY.md) for the fuller privacy model.
 
@@ -214,7 +214,7 @@ cargo test
 - Browser/PWA storage requests persistent mode where supported, but it is not a replacement for an external backup; use **Backup all** for important data.
 - The hosted PWA uses browser storage, while the macOS Tauri app uses SQLite.
 - Native iOS App Store/TestFlight distribution is not part of v1.
-- Cloud AI provider setup is disabled in the simplified v1 UI; natural quick add uses local parsing.
+- Cloud AI provider setup and natural-language entry are disabled in the simplified v1 UI.
 - Automatic foreign-currency conversion uses a read-only informational reference rate and may differ from a bank, card, or cash exchange rate; manual conversion appears only when no suitable reference is available.
 - No license file has been added yet.
 

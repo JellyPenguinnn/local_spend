@@ -79,6 +79,13 @@ export interface ExpenseMemorySuggestion {
   matchedTitle: string;
 }
 
+export interface DescriptionSuggestion {
+  title: string;
+  count: number;
+  categoryId: string;
+  paymentMethod?: string | null;
+}
+
 export function expensesForMonth(expenses: Expense[], month: string): Expense[] {
   return expenses.filter((expense) => expense.date.startsWith(month));
 }
@@ -406,6 +413,43 @@ export function suggestFromExpenseHistory(text: string, expenses: Expense[], ign
     reason: best.reason,
     matchedTitle: best.matchedTitle
   };
+}
+
+export function suggestFrequentDescriptions(prefix: string, expenses: Expense[], ignoreId?: string, limit = 3): DescriptionSuggestion[] {
+  const normalizedPrefix = prefix.trim().toLocaleLowerCase();
+  if (!normalizedPrefix || limit <= 0) return [];
+
+  const grouped = new Map<string, DescriptionSuggestion & { lastUsedAt: string }>();
+  for (const expense of expenses) {
+    if (expense.id === ignoreId) continue;
+    const title = expense.title?.trim();
+    if (!title || !title.toLocaleLowerCase().startsWith(normalizedPrefix)) continue;
+    const key = title.toLocaleLowerCase();
+    const lastUsedAt = expense.updatedAt || expense.createdAt || expense.date;
+    const current = grouped.get(key);
+    if (!current) {
+      grouped.set(key, {
+        title,
+        count: 1,
+        categoryId: expense.categoryId,
+        paymentMethod: expense.paymentMethod,
+        lastUsedAt
+      });
+      continue;
+    }
+    current.count += 1;
+    if (lastUsedAt > current.lastUsedAt) {
+      current.title = title;
+      current.categoryId = expense.categoryId;
+      current.paymentMethod = expense.paymentMethod;
+      current.lastUsedAt = lastUsedAt;
+    }
+  }
+
+  return [...grouped.values()]
+    .sort((a, b) => b.count - a.count || b.lastUsedAt.localeCompare(a.lastUsedAt) || a.title.localeCompare(b.title))
+    .slice(0, limit)
+    .map(({ lastUsedAt: _lastUsedAt, ...suggestion }) => suggestion);
 }
 
 export function searchExpenses(

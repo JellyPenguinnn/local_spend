@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, Check, MessageSquarePlus, RotateCcw } from "lucide-react";
-import { hasDuplicateExpense, suggestFromExpenseHistory } from "../lib/analytics";
+import { hasDuplicateExpense, suggestFrequentDescriptions, suggestFromExpenseHistory } from "../lib/analytics";
 import { suggestCategoryLocal } from "../lib/categories";
 import { formatExchangeRateNote, normalizeCurrencyCode, resolveReferenceRate } from "../lib/currencies";
 import { parseLocalDate } from "../lib/date";
@@ -53,6 +53,10 @@ export function ExpenseForm({
   const amountInputRef = useRef<HTMLInputElement>(null);
   const dateInputRef = useRef<HTMLInputElement>(null);
   const categoryInputRef = useRef<HTMLSelectElement>(null);
+  const paymentInputRef = useRef<HTMLSelectElement>(null);
+  const descriptionInputRef = useRef<HTMLInputElement>(null);
+  const remarkInputRef = useRef<HTMLInputElement>(null);
+  const saveButtonRef = useRef<HTMLButtonElement>(null);
   const savedTimeoutRef = useRef<number | null>(null);
   const defaultCategoryId = categories.find((category) => category.name.toLowerCase() === "food & drinks")?.id ?? categories[0]?.id ?? "";
   const defaultPaymentMethod = mostUsedPaymentMethod(expenses, settings.paymentMethods);
@@ -80,6 +84,7 @@ export function ExpenseForm({
   const [rateState, setRateState] = useState<{ rate: number; date: string; source: ExchangeRateSource } | null>(null);
   const [rateStatus, setRateStatus] = useState<"idle" | "loading" | "ready" | "unavailable">("idle");
   const [isBaseAmountManual, setIsBaseAmountManual] = useState(false);
+  const [areDescriptionSuggestionsOpen, setAreDescriptionSuggestionsOpen] = useState(false);
   const amount = typeof draft.amount === "number" ? draft.amount : parseMoney(String(draft.amount));
   const convertedAmount = typeof draft.baseAmount === "number" ? draft.baseAmount : parseMoney(String(draft.baseAmount));
   const isForeignCurrency = normalizeCurrencyCode(draft.currency) !== normalizeCurrencyCode(settings.currency);
@@ -88,6 +93,10 @@ export function ExpenseForm({
   const memorySuggestion = useMemo(
     () => suggestFromExpenseHistory(`${draft.title} ${draft.remark}`, expenses, editingExpense?.id),
     [draft.remark, draft.title, editingExpense?.id, expenses]
+  );
+  const descriptionSuggestions = useMemo(
+    () => suggestFrequentDescriptions(draft.title, expenses, editingExpense?.id),
+    [draft.title, editingExpense?.id, expenses]
   );
   const duplicate = amount !== null && hasDuplicateExpense(expenses, { amount, currency: draft.currency, date: draft.date, title: draft.title }, editingExpense?.id);
 
@@ -237,6 +246,27 @@ export function ExpenseForm({
     setError("");
   }
 
+  function focusNext(target: HTMLElement | null) {
+    target?.focus({ preventScroll: false });
+  }
+
+  function movePastAmount() {
+    focusNext(hideDate ? categoryInputRef.current : dateInputRef.current);
+  }
+
+  function applyDescriptionSuggestion(title: string, categoryId: string, paymentMethod?: string | null) {
+    setDraft((current) => ({
+      ...current,
+      title,
+      categoryId,
+      paymentMethod: paymentMethod ?? current.paymentMethod
+    }));
+    setCategoryNeedsReview(false);
+    setAreDescriptionSuggestionsOpen(false);
+    setError("");
+    focusNext(isRemarkOpen ? remarkInputRef.current : saveButtonRef.current);
+  }
+
   async function submit() {
     if (didSave || isSaving) return;
     const parsedAmount = typeof draft.amount === "number" ? draft.amount : parseMoney(String(draft.amount));
@@ -368,6 +398,11 @@ export function ExpenseForm({
               value={draft.amount}
               placeholder="0.00"
               onChange={(event) => updateAmount(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                movePastAmount();
+              }}
             />
           </div>
         </div>
@@ -396,7 +431,17 @@ export function ExpenseForm({
           <label>
             <span>Date</span>
             <div className="date-control">
-              <input ref={dateInputRef} className="native-date-input" type="date" value={draft.date} onChange={(event) => update("date", event.target.value)} aria-label="Date" />
+              <input
+                ref={dateInputRef}
+                className="native-date-input"
+                type="date"
+                value={draft.date}
+                onChange={(event) => {
+                  update("date", event.target.value);
+                  focusNext(categoryInputRef.current);
+                }}
+                aria-label="Date"
+              />
               <div className="date-display" aria-hidden="true">
                 <strong>{formatDateForField(draft.date)}</strong>
                 <CalendarDays size={17} />
@@ -409,7 +454,14 @@ export function ExpenseForm({
             Category
             {categoryNeedsReview && <small>Check</small>}
           </span>
-          <select ref={categoryInputRef} value={draft.categoryId} onChange={(event) => updateCategory(event.target.value)}>
+          <select
+            ref={categoryInputRef}
+            value={draft.categoryId}
+            onChange={(event) => {
+              updateCategory(event.target.value);
+              focusNext(paymentInputRef.current);
+            }}
+          >
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.name}
@@ -419,7 +471,14 @@ export function ExpenseForm({
         </label>
         <label>
           <span>Payment</span>
-          <select value={draft.paymentMethod} onChange={(event) => update("paymentMethod", event.target.value)}>
+          <select
+            ref={paymentInputRef}
+            value={draft.paymentMethod}
+            onChange={(event) => {
+              update("paymentMethod", event.target.value);
+              focusNext(descriptionInputRef.current);
+            }}
+          >
             {settings.paymentMethods.map((method) => (
               <option key={method} value={method}>
                 {method}
@@ -427,10 +486,51 @@ export function ExpenseForm({
             ))}
           </select>
         </label>
-        <label className="span-2">
-          <span>Description</span>
-          <input autoComplete="off" enterKeyHint="next" maxLength={MAX_DESCRIPTION_LENGTH} value={draft.title} placeholder="Lunch, NTUC, Grab..." onChange={(event) => update("title", event.target.value)} />
-        </label>
+        <div className="span-2 description-field">
+          <label>
+            <span>Description</span>
+            <input
+              ref={descriptionInputRef}
+              autoComplete="off"
+              enterKeyHint={isRemarkOpen ? "next" : "done"}
+              maxLength={MAX_DESCRIPTION_LENGTH}
+              value={draft.title}
+              placeholder="Lunch, NTUC, Grab..."
+              aria-autocomplete="list"
+              aria-controls={
+                areDescriptionSuggestionsOpen && descriptionSuggestions.length > 0
+                  ? "description-suggestions"
+                  : undefined
+              }
+              onChange={(event) => {
+                update("title", event.target.value);
+                setAreDescriptionSuggestionsOpen(true);
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                setAreDescriptionSuggestionsOpen(false);
+                focusNext(isRemarkOpen ? remarkInputRef.current : saveButtonRef.current);
+              }}
+            />
+          </label>
+          {areDescriptionSuggestionsOpen && descriptionSuggestions.length > 0 && (
+            <div className="description-suggestions" id="description-suggestions" role="listbox" aria-label="Frequent descriptions">
+              {descriptionSuggestions.map((item) => (
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected="false"
+                  key={item.title.toLocaleLowerCase()}
+                  onClick={() => applyDescriptionSuggestion(item.title, item.categoryId, item.paymentMethod)}
+                >
+                  <span>{item.title}</span>
+                  {item.count > 1 && <small>{item.count} times</small>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         {shouldShowSmartSuggestion && (
           <button
             className="smart-suggestion span-2"
@@ -453,7 +553,20 @@ export function ExpenseForm({
         {isRemarkOpen ? (
           <label className="span-2">
             <span>Remark</span>
-            <input autoComplete="off" enterKeyHint="done" maxLength={MAX_REMARK_LENGTH} value={draft.remark} placeholder="Optional note" onChange={(event) => update("remark", event.target.value)} />
+            <input
+              ref={remarkInputRef}
+              autoComplete="off"
+              enterKeyHint="done"
+              maxLength={MAX_REMARK_LENGTH}
+              value={draft.remark}
+              placeholder="Optional note"
+              onChange={(event) => update("remark", event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                focusNext(saveButtonRef.current);
+              }}
+            />
           </label>
         ) : (
           <button className="optional-field-toggle span-2" type="button" onClick={() => setIsRemarkOpen(true)}>
@@ -471,7 +584,7 @@ export function ExpenseForm({
       )}
       {error && <p className="form-note danger" role="alert">{error}</p>}
       <p className="sr-only" aria-live="polite">{didSave ? "Expense saved." : isSaving ? "Saving expense." : ""}</p>
-      <button className={didSave ? "primary-button save-button saved" : "primary-button save-button"} type="submit" disabled={didSave || isSaving}>
+      <button ref={saveButtonRef} className={didSave ? "primary-button save-button saved" : "primary-button save-button"} type="submit" disabled={didSave || isSaving}>
         <Check size={17} />
         {didSave
           ? "Saved"

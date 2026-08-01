@@ -6,6 +6,7 @@ export const MAX_WALLPAPER_SOURCE_BYTES = 8 * 1024 * 1024;
 export const MAX_WALLPAPER_STORED_BYTES = 220 * 1024;
 export const WALLPAPER_MAX_DIMENSION = 1280;
 export const DEFAULT_WALLPAPER_OPACITY = 0.34;
+export const DEFAULT_CONTENT_OPACITY = 0.88;
 
 const QUALITY_STEPS = [0.72, 0.62, 0.52, 0.42];
 
@@ -16,6 +17,11 @@ export function trimWallpapers(wallpapers: WallpaperImage[]): WallpaperImage[] {
 export function clampWallpaperOpacity(value: number | null | undefined): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return DEFAULT_WALLPAPER_OPACITY;
   return Math.min(0.55, Math.max(0.12, value));
+}
+
+export function clampContentOpacity(value: number | null | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return DEFAULT_CONTENT_OPACITY;
+  return Math.min(1, Math.max(0.58, value));
 }
 
 export function formatBytes(bytes: number): string {
