@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarDays, ChartPie, ClipboardList, Loader2, Settings } from "lucide-react";
+import { ArrowRight, CalendarDays, ChartPie, ClipboardList, Loader2, Settings, Upload } from "lucide-react";
 import { createRepository } from "./lib/storage/repository";
 import type { Expense, ProfileData, ProfilesState, ViewKey } from "./lib/types";
 import { createDefaultProfileData } from "./lib/defaults";
@@ -7,11 +7,9 @@ import { TodayScreen } from "./screens/TodayScreen";
 import { CalendarScreen } from "./screens/CalendarScreen";
 import { SummaryScreen } from "./screens/SummaryScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
-import { ProfileSwitcher } from "./components/ProfileSwitcher";
 import { clampWallpaperOpacity, contentOpacityTokens } from "./lib/wallpaper";
 import { MAX_BACKUP_FILE_BYTES, restoreBackup } from "./lib/backup";
 import { resolveRecurringRuleNextDate } from "./lib/recurring";
-import { MAX_PROFILE_NAME_LENGTH } from "./lib/dataLimits";
 
 const NAV_ITEMS: Array<{ key: ViewKey; label: string; icon: typeof ClipboardList }> = [
   { key: "today", label: "Today", icon: ClipboardList },
@@ -120,23 +118,15 @@ export default function App() {
     });
   }
 
-  async function switchProfile(profileId: string) {
+  async function createFirstProfile() {
     setIsLoading(true);
+    setError("");
     try {
-      const state = await repository.switchProfile(profileId);
+      const state = await repository.createProfile({ displayName: "My spending" });
       await applyProfilesState(state);
       setView("today");
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function createFirstProfile(name: string) {
-    setIsLoading(true);
-    try {
-      const state = await repository.createProfile({ displayName: name.trim().slice(0, MAX_PROFILE_NAME_LENGTH) });
-      await applyProfilesState(state);
-      setView("today");
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : "Could not start LocalSpend.");
     } finally {
       setIsLoading(false);
     }
@@ -173,7 +163,7 @@ export default function App() {
   }
 
   if (!activeProfile || !data) {
-    return <FirstLaunch error={error} onCreate={(name) => void createFirstProfile(name)} onRestore={restoreFirstProfile} />;
+    return <FirstLaunch error={error} onCreate={() => void createFirstProfile()} onRestore={restoreFirstProfile} />;
   }
 
   return (
@@ -185,7 +175,7 @@ export default function App() {
           </span>
           <div>
             <strong>LocalSpend</strong>
-            <small>Private spending, one profile at a time</small>
+            <small>Private spending, kept on this device</small>
           </div>
         </div>
         <nav className="nav-list" aria-label="Main navigation">
@@ -199,17 +189,9 @@ export default function App() {
             );
           })}
         </nav>
-        <ProfileSwitcher state={profilesState} activeProfile={activeProfile} onSwitch={(profileId) => void switchProfile(profileId)} onCreateQuick={() => setView("settings")} />
       </header>
 
       <main className="main-shell">
-        <div className="view-title-row">
-          <div>
-            <p className="eyebrow">Active profile</p>
-            <h1>{activeProfile.displayName}</h1>
-          </div>
-        </div>
-
         {error && (
           <div className="error-banner" role="alert">
             <span>{error}</span>
@@ -237,53 +219,37 @@ export default function App() {
   );
 }
 
-function FirstLaunch({ error, onCreate, onRestore }: { error: string; onCreate: (name: string) => void; onRestore: (file: File) => Promise<string | null> }) {
-  const [name, setName] = useState("");
+function FirstLaunch({ error, onCreate, onRestore }: { error: string; onCreate: () => void; onRestore: (file: File) => Promise<string | null> }) {
   const [restoreError, setRestoreError] = useState("");
   return (
     <main className="first-launch">
       <section className="first-card">
-        <div className="brand large">
-          <span className="brand-mark" aria-hidden="true">
-            <img src={`${import.meta.env.BASE_URL}localspend-icon.svg`} alt="" />
-          </span>
-          <div>
-            <strong>LocalSpend</strong>
-            <small>Local, private, calm.</small>
-          </div>
+        <div className="first-launch-mark" aria-hidden="true">
+          <img src={`${import.meta.env.BASE_URL}localspend-icon.svg`} alt="" />
         </div>
-        <h1>Create your local profile</h1>
-        <p>Each profile gets its own local spending database, so friends or family can share the app without mixing records.</p>
-        <label>
-          <span>Display name</span>
-          <input
-            autoFocus
-            maxLength={MAX_PROFILE_NAME_LENGTH}
-            value={name}
-            placeholder="Brian"
-            onChange={(event) => setName(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && name.trim()) onCreate(name.trim());
-            }}
-          />
-        </label>
-        <button className="primary-button" type="button" disabled={!name.trim()} onClick={() => onCreate(name.trim())}>
-          Create profile
-        </button>
-        <div className="first-launch-divider"><span>or</span></div>
-        <label className="file-button first-restore-button">
-          Restore backup
-          <input
-            type="file"
-            accept="application/json,.json"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.currentTarget.value = "";
-              if (!file) return;
-              void onRestore(file).then((message) => setRestoreError(message ?? ""));
-            }}
-          />
-        </label>
+        <p className="first-launch-name">LocalSpend</p>
+        <h1>Track spending, simply.</h1>
+        <p className="first-launch-intro">No account or sign-in. Your spending stays on this device.</p>
+        <div className="first-launch-actions">
+          <button className="primary-button first-start-button" type="button" onClick={onCreate}>
+            <span>Start tracking</span>
+            <ArrowRight size={18} aria-hidden="true" />
+          </button>
+          <label className="file-button first-restore-button">
+            <Upload size={18} aria-hidden="true" />
+            <span>Restore backup</span>
+            <input
+              type="file"
+              accept="application/json,.json"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.currentTarget.value = "";
+                if (!file) return;
+                void onRestore(file).then((message) => setRestoreError(message ?? ""));
+              }}
+            />
+          </label>
+        </div>
         {(error || restoreError) && <p className="form-note danger" role="alert">{restoreError || error}</p>}
       </section>
     </main>

@@ -2,6 +2,7 @@
 
 ## Completed
 
+- Simplified first use into a device-local start screen: removed display-name/account language and visible profile controls, kept one `Start tracking` action plus first-run backup restore, and preserved the internal local data container for storage compatibility.
 - Finalized the LocalSpend identity with a modern receipt-slip mark, warm yellow background, aqua entry line, indigo total line, and consistent PWA, iOS, macOS, Android, and Windows icon assets.
 - Stabilized wallpaper-mode tab changes by removing nested blur and tab-entry compositing, and widened content transparency to 16%-100%.
 - Expanded content transparency into a layered wallpaper-aware glass range with stronger blur and adaptive legibility.
