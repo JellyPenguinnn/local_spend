@@ -53,7 +53,7 @@ describe("TodayScreen entry flow", () => {
     expect(entry).toHaveTextContent("≈ SGD 9.15");
   });
 
-  it("focuses amount and advances through the manual fields", () => {
+  it("focuses amount and guides the user through category and payment", async () => {
     render(
       <TodayScreen
         profileId="profile_test"
@@ -76,11 +76,12 @@ describe("TodayScreen entry flow", () => {
     expect(screen.getByLabelText("Payment")).toHaveValue("PayNow");
 
     fireEvent.keyDown(screen.getByLabelText("Amount"), { key: "Enter" });
-    expect(screen.getByLabelText("Category")).toHaveFocus();
-    fireEvent.change(screen.getByLabelText("Category"), { target: { value: "cat_transport" } });
-    expect(screen.getByLabelText("Payment")).toHaveFocus();
-    fireEvent.change(screen.getByLabelText("Payment"), { target: { value: "Apple Pay" } });
-    expect(screen.getByLabelText("Description")).toHaveFocus();
+    expect(screen.getByRole("dialog", { name: "Choose category" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Transport" }));
+    expect(screen.getByLabelText("Category")).toHaveValue("cat_transport");
+    expect(screen.getByRole("dialog", { name: "Choose payment" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Apple Pay" }));
+    await waitFor(() => expect(screen.getByLabelText("Description")).toHaveFocus());
     fireEvent.keyDown(screen.getByLabelText("Description"), { key: "Enter" });
     expect(screen.getByRole("button", { name: "Save" })).toHaveFocus();
 

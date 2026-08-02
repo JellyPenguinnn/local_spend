@@ -24,6 +24,10 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  document.documentElement.style.removeProperty("--wallpaper-opacity");
+  document.documentElement.style.removeProperty("--content-opacity-soft");
+  document.documentElement.style.removeProperty("--content-opacity");
+  document.documentElement.style.removeProperty("--content-opacity-strong");
 });
 
 describe("Settings data controls", () => {
@@ -172,6 +176,31 @@ describe("Settings data controls", () => {
 });
 
 describe("Settings organization", () => {
+  it("previews content transparency immediately and saves it when adjustment ends", async () => {
+    const data = createDefaultProfileData();
+    data.appSettings.wallpapers = [{
+      id: "wallpaper_test",
+      name: "Test wallpaper",
+      dataUrl: "data:image/png;base64,test",
+      mimeType: "image/png",
+      sizeBytes: 4,
+      createdAt: "2026-07-09T00:00:00.000Z"
+    }];
+    data.appSettings.activeWallpaperId = "wallpaper_test";
+    const saveData = vi.fn().mockResolvedValue(true);
+    render(<SettingsScreen activeProfile={profile} data={data} repository={createRepositoryMock()} saveData={saveData} />);
+
+    const control = screen.getByLabelText("Content boxes");
+    fireEvent.change(control, { target: { value: "0.6" } });
+
+    expect(document.documentElement.style.getPropertyValue("--content-opacity")).toBe("60%");
+    expect(saveData).not.toHaveBeenCalled();
+
+    fireEvent.pointerUp(control);
+    await waitFor(() => expect(saveData).toHaveBeenCalledTimes(1));
+    expect(saveData.mock.calls[0][0].appSettings.contentOpacity).toBe(0.6);
+  });
+
   it("groups categories and payment methods in one compact Spending section", () => {
     const data = createDefaultProfileData();
     render(<SettingsScreen activeProfile={profile} data={data} repository={createRepositoryMock()} saveData={vi.fn().mockResolvedValue(true)} />);

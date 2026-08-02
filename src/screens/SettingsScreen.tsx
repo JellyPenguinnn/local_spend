@@ -1,4 +1,4 @@
-import { type ChangeEvent, type CSSProperties, useState } from "react";
+import { type ChangeEvent, type CSSProperties, useEffect, useState } from "react";
 import { BookOpen, CalendarDays, Check, ChevronDown, Coins, Download, Lock, Pencil, PiggyBank, Plus, Repeat2, RotateCcw, Search, ShieldCheck, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
 import { CategoryChip } from "../components/CategoryChip";
 import { FormBackAction } from "../components/FormBackAction";
@@ -26,6 +26,7 @@ import {
   MAX_WALLPAPERS,
   clampContentOpacity,
   clampWallpaperOpacity,
+  contentOpacityTokens,
   createWallpaperFromFile,
   formatBytes,
   trimWallpapers
@@ -152,6 +153,8 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
   const [isDataBusy, setIsDataBusy] = useState(false);
   const [dataStatus, setDataStatus] = useState("");
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [wallpaperOpacityDraft, setWallpaperOpacityDraft] = useState(() => clampWallpaperOpacity(data.appSettings.wallpaperOpacity));
+  const [contentOpacityDraft, setContentOpacityDraft] = useState(() => clampContentOpacity(data.appSettings.contentOpacity));
   const accentPalette = normalizeAccentPalette(data.appSettings.accentPalette);
   const currentAccent = data.appSettings.accentColor.toLowerCase();
   const isAccentSaved = accentPalette.includes(currentAccent);
@@ -226,6 +229,14 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
         ).nextDate
       : null;
 
+  useEffect(() => {
+    setWallpaperOpacityDraft(clampWallpaperOpacity(data.appSettings.wallpaperOpacity));
+  }, [data.appSettings.wallpaperOpacity]);
+
+  useEffect(() => {
+    setContentOpacityDraft(clampContentOpacity(data.appSettings.contentOpacity));
+  }, [data.appSettings.contentOpacity]);
+
   async function updateSettings(patch: Partial<ProfileData["appSettings"]>) {
     return saveData({
       ...data,
@@ -234,6 +245,31 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
         ...patch
       }
     });
+  }
+
+  function previewWallpaperOpacity(value: number) {
+    const opacity = clampWallpaperOpacity(value);
+    setWallpaperOpacityDraft(opacity);
+    document.documentElement.style.setProperty("--wallpaper-opacity", String(opacity));
+  }
+
+  function previewContentOpacity(value: number) {
+    const opacity = clampContentOpacity(value);
+    const tokens = contentOpacityTokens(opacity);
+    setContentOpacityDraft(opacity);
+    document.documentElement.style.setProperty("--content-opacity-soft", tokens.soft);
+    document.documentElement.style.setProperty("--content-opacity", tokens.base);
+    document.documentElement.style.setProperty("--content-opacity-strong", tokens.strong);
+  }
+
+  async function persistWallpaperOpacity(value: number) {
+    const opacity = clampWallpaperOpacity(value);
+    if (opacity !== data.appSettings.wallpaperOpacity) await updateSettings({ wallpaperOpacity: opacity });
+  }
+
+  async function persistContentOpacity(value: number) {
+    const opacity = clampContentOpacity(value);
+    if (opacity !== data.appSettings.contentOpacity) await updateSettings({ contentOpacity: opacity });
   }
 
   async function changeBaseCurrency(currency: string) {
@@ -886,8 +922,11 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
                     min="0.12"
                     max="0.55"
                     step="0.01"
-                    value={clampWallpaperOpacity(data.appSettings.wallpaperOpacity)}
-                    onChange={(event) => void updateSettings({ wallpaperOpacity: Number(event.target.value) })}
+                    value={wallpaperOpacityDraft}
+                    onChange={(event) => previewWallpaperOpacity(Number(event.target.value))}
+                    onPointerUp={(event) => void persistWallpaperOpacity(Number(event.currentTarget.value))}
+                    onKeyUp={(event) => void persistWallpaperOpacity(Number(event.currentTarget.value))}
+                    onBlur={(event) => void persistWallpaperOpacity(Number(event.currentTarget.value))}
                   />
                 </label>
                 <label className="wallpaper-opacity-control">
@@ -897,8 +936,11 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
                     min="0.58"
                     max="1"
                     step="0.01"
-                    value={clampContentOpacity(data.appSettings.contentOpacity)}
-                    onChange={(event) => void updateSettings({ contentOpacity: Number(event.target.value) })}
+                    value={contentOpacityDraft}
+                    onChange={(event) => previewContentOpacity(Number(event.target.value))}
+                    onPointerUp={(event) => void persistContentOpacity(Number(event.currentTarget.value))}
+                    onKeyUp={(event) => void persistContentOpacity(Number(event.currentTarget.value))}
+                    onBlur={(event) => void persistContentOpacity(Number(event.currentTarget.value))}
                   />
                 </label>
               </div>
@@ -1313,7 +1355,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
                   <div><Coins size={17} /><span><strong>Multiple currencies</strong><small>Keeps original amounts and dated conversions; review each currency in Summary.</small></span></div>
                   <div><Search size={17} /><span><strong>Search spending</strong><small>Filter by description, category, date, or amount; open a result to edit.</small></span></div>
                   <div><SlidersHorizontal size={17} /><span><strong>Customize</strong><small>Manage categories and payments; set mode, color, and wallpaper.</small></span></div>
-                  <div><ShieldCheck size={17} /><span><strong>Private data</strong><small>Stays on this device; Backup all preserves settings, while CSV covers expenses.</small></span></div>
+                  <div><ShieldCheck size={17} /><span><strong>Private data</strong><small>Stored on this device. Save Backup all to Files or iCloud Drive before removing the app.</small></span></div>
                 </div>
               </div>
             )}
@@ -1321,6 +1363,10 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
 
           <section className="panel settings-panel data-control-card" aria-busy={isDataBusy}>
             <div className="account-card-head"><span>Data</span></div>
+            <p className="data-local-note">
+              <ShieldCheck size={16} aria-hidden="true" />
+              <span>Removing the app can erase local records. Keep a Backup all file in Files or iCloud Drive.</span>
+            </p>
             {dataStatus && <p className="form-note warning data-status" role="alert">{dataStatus}</p>}
             <div className="data-action-group">
               <span className="data-action-label">All data</span>

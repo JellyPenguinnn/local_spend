@@ -36,7 +36,7 @@ import {
 } from "./recurring";
 import { createRepository } from "./storage/repository";
 import { changedBrowserProfileSections, joinBrowserProfileSections, splitBrowserProfileData } from "./storage/browserSections";
-import { MAX_WALLPAPERS, clampContentOpacity, clampWallpaperOpacity, trimWallpapers } from "./wallpaper";
+import { MAX_WALLPAPERS, clampContentOpacity, clampWallpaperOpacity, contentOpacityTokens, trimWallpapers } from "./wallpaper";
 import type { Expense, ProfileData, ProfileMeta, RecurringRule, WallpaperImage } from "./types";
 
 afterEach(() => {
@@ -98,6 +98,7 @@ describe("wallpaper settings", () => {
     expect(clampContentOpacity(0.2)).toBe(0.58);
     expect(clampContentOpacity(1.2)).toBe(1);
     expect(clampContentOpacity(undefined)).toBe(0.88);
+    expect(contentOpacityTokens(0.6)).toEqual({ soft: "48%", base: "60%", strong: "68%" });
   });
 });
 

@@ -2,6 +2,8 @@
 
 ## Completed
 
+- Fixed wallpaper and content transparency controls to preview immediately and persist after adjustment.
+- Added touch-friendly category and payment choices after amount confirmation on iPhone.
 - Read and obeyed `AGENTS.md`.
 - Researched current Tauri, SQLite, charting, AI provider, key storage, and macOS packaging guidance.
 - Created core project documentation.

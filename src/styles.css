@@ -1447,6 +1447,116 @@ button.currency-breakdown-chip.interactive:active {
   font-size: 0.72rem;
 }
 
+.flow-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  align-items: end;
+  padding:
+    1rem calc(1rem + env(safe-area-inset-right))
+    calc(1rem + env(safe-area-inset-bottom)) calc(1rem + env(safe-area-inset-left));
+  background: color-mix(in srgb, var(--text) 22%, transparent);
+  backdrop-filter: blur(7px);
+}
+
+.flow-picker-sheet {
+  width: min(100%, 500px);
+  max-height: min(72dvh, 610px);
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--material-border);
+  border-radius: 16px;
+  padding: 0.9rem;
+  background: var(--material-strong);
+  box-shadow: 0 24px 64px rgba(24, 24, 21, 0.24);
+  backdrop-filter: blur(24px) saturate(1.12);
+  animation: flow-picker-in 170ms ease-out both;
+}
+
+.flow-picker-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.flow-picker-heading span {
+  display: block;
+  margin-bottom: 0.08rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.flow-picker-heading h3 {
+  font-size: 1.1rem;
+}
+
+.flow-picker-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.42rem;
+  max-height: calc(min(72dvh, 610px) - 4.5rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.flow-picker-options button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.48rem;
+  min-width: 0;
+  min-height: 48px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  padding: 0.58rem;
+  background: color-mix(in srgb, var(--surface) 76%, transparent);
+  color: var(--text);
+  text-align: left;
+}
+
+.flow-picker-options button.active {
+  border-color: color-mix(in srgb, var(--accent) 54%, var(--border));
+  background: var(--accent-wash-strong);
+}
+
+.flow-picker-options strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.82rem;
+  line-height: 1.16;
+}
+
+.flow-picker-options button > svg {
+  color: var(--accent);
+}
+
+.flow-picker-color,
+.flow-picker-payment-dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+}
+
+.flow-picker-payment-dot {
+  background: var(--accent);
+}
+
+@keyframes flow-picker-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.8rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .field-needs-review > span:first-child {
   display: flex;
   align-items: center;
@@ -3108,6 +3218,22 @@ button.currency-breakdown-chip.interactive:active {
 .data-action-group {
   display: grid;
   gap: 0.45rem;
+}
+
+.data-local-note {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.48rem;
+  margin: 0 0 0.85rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.data-local-note svg {
+  margin-top: 0.08rem;
+  color: var(--accent);
 }
 
 .data-action-group.csv-actions {

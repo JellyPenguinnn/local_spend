@@ -8,7 +8,7 @@ import { CalendarScreen } from "./screens/CalendarScreen";
 import { SummaryScreen } from "./screens/SummaryScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { ProfileSwitcher } from "./components/ProfileSwitcher";
-import { clampContentOpacity, clampWallpaperOpacity } from "./lib/wallpaper";
+import { clampWallpaperOpacity, contentOpacityTokens } from "./lib/wallpaper";
 import { MAX_BACKUP_FILE_BYTES, restoreBackup } from "./lib/backup";
 import { resolveRecurringRuleNextDate } from "./lib/recurring";
 import { MAX_PROFILE_NAME_LENGTH } from "./lib/dataLimits";
@@ -79,10 +79,10 @@ export default function App() {
     document.documentElement.style.setProperty("--user-accent", accentColor);
     document.documentElement.style.setProperty("--wallpaper-image", activeWallpaper ? `url("${activeWallpaper.dataUrl}")` : "none");
     document.documentElement.style.setProperty("--wallpaper-opacity", activeWallpaper ? String(clampWallpaperOpacity(settings?.wallpaperOpacity)) : "0");
-    const contentOpacity = clampContentOpacity(settings?.contentOpacity);
-    document.documentElement.style.setProperty("--content-opacity-soft", `${Math.round(Math.max(0.46, contentOpacity - 0.12) * 100)}%`);
-    document.documentElement.style.setProperty("--content-opacity", `${Math.round(contentOpacity * 100)}%`);
-    document.documentElement.style.setProperty("--content-opacity-strong", `${Math.round(Math.min(1, contentOpacity + 0.08) * 100)}%`);
+    const contentOpacity = contentOpacityTokens(settings?.contentOpacity);
+    document.documentElement.style.setProperty("--content-opacity-soft", contentOpacity.soft);
+    document.documentElement.style.setProperty("--content-opacity", contentOpacity.base);
+    document.documentElement.style.setProperty("--content-opacity-strong", contentOpacity.strong);
 
     const themeColorMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
     themeColorMeta?.setAttribute("content", activeWallpaper ? accentColor : theme === "dark" ? "#171917" : "#fafaf7");

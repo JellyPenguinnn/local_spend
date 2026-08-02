@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, Check, MessageSquarePlus, RotateCcw } from "lucide-react";
+import { CalendarDays, Check, MessageSquarePlus, RotateCcw, X } from "lucide-react";
 import { hasDuplicateExpense, suggestFrequentDescriptions, suggestFromExpenseHistory } from "../lib/analytics";
 import { suggestCategoryLocal } from "../lib/categories";
 import { formatExchangeRateNote, normalizeCurrencyCode, resolveReferenceRate } from "../lib/currencies";
@@ -85,6 +85,7 @@ export function ExpenseForm({
   const [rateStatus, setRateStatus] = useState<"idle" | "loading" | "ready" | "unavailable">("idle");
   const [isBaseAmountManual, setIsBaseAmountManual] = useState(false);
   const [areDescriptionSuggestionsOpen, setAreDescriptionSuggestionsOpen] = useState(false);
+  const [flowPicker, setFlowPicker] = useState<"category" | "payment" | null>(null);
   const amount = typeof draft.amount === "number" ? draft.amount : parseMoney(String(draft.amount));
   const convertedAmount = typeof draft.baseAmount === "number" ? draft.baseAmount : parseMoney(String(draft.baseAmount));
   const isForeignCurrency = normalizeCurrencyCode(draft.currency) !== normalizeCurrencyCode(settings.currency);
@@ -248,10 +249,31 @@ export function ExpenseForm({
 
   function focusNext(target: HTMLElement | null) {
     target?.focus({ preventScroll: false });
+    target?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+  }
+
+  function openFlowPicker(picker: "category" | "payment") {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    setFlowPicker(picker);
   }
 
   function movePastAmount() {
-    focusNext(hideDate ? categoryInputRef.current : dateInputRef.current);
+    if (hideDate) {
+      openFlowPicker("category");
+      return;
+    }
+    focusNext(dateInputRef.current);
+  }
+
+  function chooseFlowCategory(categoryId: string) {
+    updateCategory(categoryId);
+    openFlowPicker("payment");
+  }
+
+  function chooseFlowPayment(paymentMethod: string) {
+    update("paymentMethod", paymentMethod);
+    setFlowPicker(null);
+    window.setTimeout(() => focusNext(descriptionInputRef.current), 0);
   }
 
   function applyDescriptionSuggestion(title: string, categoryId: string, paymentMethod?: string | null) {
@@ -438,7 +460,7 @@ export function ExpenseForm({
                 value={draft.date}
                 onChange={(event) => {
                   update("date", event.target.value);
-                  focusNext(categoryInputRef.current);
+                  openFlowPicker("category");
                 }}
                 aria-label="Date"
               />
@@ -459,6 +481,7 @@ export function ExpenseForm({
             value={draft.categoryId}
             onChange={(event) => {
               updateCategory(event.target.value);
+              setFlowPicker(null);
               focusNext(paymentInputRef.current);
             }}
           >
@@ -476,6 +499,7 @@ export function ExpenseForm({
             value={draft.paymentMethod}
             onChange={(event) => {
               update("paymentMethod", event.target.value);
+              setFlowPicker(null);
               focusNext(descriptionInputRef.current);
             }}
           >
@@ -575,6 +599,55 @@ export function ExpenseForm({
           </button>
         )}
       </div>
+      {flowPicker && (
+        <div
+          className="flow-picker-backdrop"
+          role="presentation"
+          onClick={(event) => {
+            if (event.currentTarget !== event.target) return;
+            setFlowPicker(null);
+          }}
+        >
+          <section className="flow-picker-sheet" role="dialog" aria-modal="true" aria-labelledby={`flow-picker-${flowPicker}-title`}>
+            <div className="flow-picker-heading">
+              <div>
+                <span>Next</span>
+                <h3 id={`flow-picker-${flowPicker}-title`}>{flowPicker === "category" ? "Choose category" : "Choose payment"}</h3>
+              </div>
+              <button className="icon-button" type="button" onClick={() => setFlowPicker(null)} aria-label="Close choices">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flow-picker-options">
+              {flowPicker === "category"
+                ? categories.map((category) => (
+                    <button
+                      className={draft.categoryId === category.id ? "active" : ""}
+                      type="button"
+                      key={category.id}
+                      onClick={() => chooseFlowCategory(category.id)}
+                    >
+                      <span className="flow-picker-color" style={{ backgroundColor: category.color }} aria-hidden="true" />
+                      <strong>{category.name}</strong>
+                      {draft.categoryId === category.id && <Check size={15} aria-hidden="true" />}
+                    </button>
+                  ))
+                : settings.paymentMethods.map((method) => (
+                    <button
+                      className={draft.paymentMethod === method ? "active" : ""}
+                      type="button"
+                      key={method}
+                      onClick={() => chooseFlowPayment(method)}
+                    >
+                      <span className="flow-picker-payment-dot" aria-hidden="true" />
+                      <strong>{method}</strong>
+                      {draft.paymentMethod === method && <Check size={15} aria-hidden="true" />}
+                    </button>
+                  ))}
+            </div>
+          </section>
+        </div>
+      )}
       {isDuplicateConfirmationVisible && duplicate && (
         <p className="form-note warning" role="status">
           {draft.title.trim()
