@@ -1,16 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="LocalSpend spending mark">
-  <rect width="512" height="512" fill="#236b63"/>
-  <circle cx="256" cy="220" r="108" fill="none" stroke="#f8f8f3" stroke-width="54"/>
-  <circle
-    cx="256"
-    cy="220"
-    r="108"
-    fill="none"
-    stroke="#f0b95c"
-    stroke-width="54"
-    stroke-linecap="round"
-    stroke-dasharray="142 537"
-    transform="rotate(-30 256 220)"
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="LocalSpend receipt mark">
+  <defs>
+    <radialGradient id="background" cx="50%" cy="43%" r="72%">
+      <stop offset="0" stop-color="#f9c64e" />
+      <stop offset="1" stop-color="#f7c041" />
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#background)" />
+  <path
+    d="M146 135h220a26 26 0 0 1 26 26v151l-66 66H120V161a26 26 0 0 1 26-26Z"
+    fill="#f3ece4"
   />
-  <path d="M202 371h108" fill="none" stroke="#f8f8f3" stroke-width="32" stroke-linecap="round"/>
+  <path d="M326 378v-40a17 17 0 0 1 17-17h49Z" fill="#e2d1b6" />
+  <rect x="159" y="234" width="112" height="9" rx="4.5" fill="#6ab6b9" />
+  <rect x="159" y="278" width="186" height="13" rx="6.5" fill="#12337b" />
 </svg>

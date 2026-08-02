@@ -5,8 +5,8 @@
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
-  "background_color": "#f3dfb6",
-  "theme_color": "#f3dfb6",
+  "background_color": "#f7c041",
+  "theme_color": "#f7c041",
   "icons": [
     {
       "src": "localspend-icon-192.png",

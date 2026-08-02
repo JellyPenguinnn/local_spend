@@ -2,6 +2,7 @@
 
 ## Completed
 
+- Finalized the LocalSpend identity with a modern receipt-slip mark, warm yellow background, aqua entry line, indigo total line, and consistent PWA, iOS, macOS, Android, and Windows icon assets.
 - Stabilized wallpaper-mode tab changes by removing nested blur and tab-entry compositing, and widened content transparency to 16%-100%.
 - Expanded content transparency into a layered wallpaper-aware glass range with stronger blur and adaptive legibility.
 - Fixed wallpaper and content transparency controls to preview immediately and persist after adjustment.
