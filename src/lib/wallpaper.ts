@@ -21,15 +21,15 @@ export function clampWallpaperOpacity(value: number | null | undefined): number 
 
 export function clampContentOpacity(value: number | null | undefined): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return DEFAULT_CONTENT_OPACITY;
-  return Math.min(1, Math.max(0.28, value));
+  return Math.min(1, Math.max(0.16, value));
 }
 
 export function contentOpacityTokens(value: number | null | undefined): { soft: string; base: string; strong: string } {
   const opacity = clampContentOpacity(value);
   return {
-    soft: `${Math.round(Math.max(0.16, opacity - 0.14) * 100)}%`,
+    soft: `${Math.round(Math.max(0.08, opacity - 0.12) * 100)}%`,
     base: `${Math.round(opacity * 100)}%`,
-    strong: `${Math.round(Math.min(1, opacity + 0.16) * 100)}%`
+    strong: `${Math.round(Math.min(1, opacity + 0.14) * 100)}%`
   };
 }
 

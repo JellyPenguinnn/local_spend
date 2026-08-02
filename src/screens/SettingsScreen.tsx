@@ -933,7 +933,7 @@ export function SettingsScreen({ activeProfile, data, repository, saveData }: Se
                   <span>Content boxes</span>
                   <input
                     type="range"
-                    min="0.28"
+                    min="0.16"
                     max="1"
                     step="0.01"
                     value={contentOpacityDraft}

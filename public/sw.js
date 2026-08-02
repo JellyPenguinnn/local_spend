@@ -1,7 +1,7 @@
 /* global self, caches, fetch, URL, Response */
 
 const CACHE_PREFIX = "localspend-shell-";
-const CACHE_NAME = `${CACHE_PREFIX}v26`;
+const CACHE_NAME = `${CACHE_PREFIX}v27`;
 const APP_SCOPE = new URL(self.registration.scope);
 const APP_SHELL = ["./", "manifest.webmanifest", "localspend-icon.svg", "apple-touch-icon.png", "localspend-icon-192.png", "localspend-icon-512.png"].map((path) => new URL(path, APP_SCOPE).toString());
 
