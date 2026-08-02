@@ -155,3 +155,11 @@ Researched on 2026-07-12.
 - Lunch Money independently validates the same reporting model: it converts cross-border expenses into a primary currency, uses the transaction date's historical rate, and preserves access to the rate used for each transaction: https://lunchmoney.app/features/multicurrency/
 - YNAB recommends separate plans for separate currencies to eliminate exchange-rate ambiguity, but also requires duplicated transfer and reconciliation work. That is appropriate for fully separate financial systems, not LocalSpend's common SGD base with occasional MYR travel spending: https://support.ynab.com/en_us/using-multiple-currencies-in-ynab-a-guide-SyBF6PHno
 - Final UX audit: `By currency` is the single label across Today, Calendar, category review, and Summary. It appears only when foreign spending exists. Static screens use compact read-only values; Summary adds chevrons and a focused drill-down, so clickability is visible without adding instructions or a global display toggle.
+
+## Wallpaper-Aware Materials
+
+Researched on 2026-08-02.
+
+- Apple's Liquid Glass material combines transparency with adaptive tint, blur, highlights, and shadow to preserve definition over changing content; it is not simply a low-opacity white layer: https://developer.apple.com/videos/play/wwdc2025/219/
+- Apple recommends reserving Liquid Glass itself for floating controls and navigation, while using standard materials for content surfaces to avoid a confusing hierarchy: https://developer.apple.com/design/human-interface-guidelines/materials
+- LocalSpend therefore keeps content cards as restrained frosted materials: the wallpaper can show through a broader opacity range, while stronger blur, a fine highlight edge, and subtle accent tint protect text legibility. Navigation remains a stronger material above the content layer.

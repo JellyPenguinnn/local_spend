@@ -95,10 +95,11 @@ describe("wallpaper settings", () => {
     expect(trimWallpapers(wallpapers)).toHaveLength(MAX_WALLPAPERS);
     expect(clampWallpaperOpacity(0.01)).toBe(0.12);
     expect(clampWallpaperOpacity(0.7)).toBe(0.55);
-    expect(clampContentOpacity(0.2)).toBe(0.58);
+    expect(clampContentOpacity(0.2)).toBe(0.28);
     expect(clampContentOpacity(1.2)).toBe(1);
     expect(clampContentOpacity(undefined)).toBe(0.88);
-    expect(contentOpacityTokens(0.6)).toEqual({ soft: "48%", base: "60%", strong: "68%" });
+    expect(contentOpacityTokens(0.28)).toEqual({ soft: "16%", base: "28%", strong: "44%" });
+    expect(contentOpacityTokens(0.6)).toEqual({ soft: "46%", base: "60%", strong: "76%" });
   });
 });
 

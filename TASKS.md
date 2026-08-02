@@ -2,6 +2,7 @@
 
 ## Completed
 
+- Expanded content transparency into a layered wallpaper-aware glass range with stronger blur and adaptive legibility.
 - Fixed wallpaper and content transparency controls to preview immediately and persist after adjustment.
 - Added touch-friendly category and payment choices after amount confirmation on iPhone.
 - Read and obeyed `AGENTS.md`.

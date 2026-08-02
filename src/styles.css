@@ -31,6 +31,10 @@
   --content-opacity-soft: 76%;
   --content-opacity: 88%;
   --content-opacity-strong: 96%;
+  --content-sheen: 22%;
+  --content-blur: 22px;
+  --content-saturation: 1.08;
+  --content-brightness: 1;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -61,6 +65,7 @@
   --shadow-soft: 0 14px 34px rgba(0, 0, 0, 0.22);
   --shadow-lift: 0 16px 40px color-mix(in srgb, var(--accent) 14%, transparent), 0 12px 32px rgba(0, 0, 0, 0.24);
   --inner-glow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  --content-sheen: 10%;
 }
 
 :root[data-wallpaper="on"] {
@@ -73,6 +78,10 @@
   --accent-wash: color-mix(in srgb, var(--accent) 4%, var(--material));
   --accent-wash-strong: color-mix(in srgb, var(--accent) 7%, var(--material-strong));
   --shadow: 0 20px 52px rgba(36, 34, 28, 0.1);
+  --content-sheen: 11%;
+  --content-blur: 32px;
+  --content-saturation: 1.2;
+  --content-brightness: 1.035;
 }
 
 :root[data-theme="dark"][data-wallpaper="on"] {
@@ -85,6 +94,8 @@
   --accent-wash: color-mix(in srgb, var(--accent) 7%, var(--material));
   --accent-wash-strong: color-mix(in srgb, var(--accent) 10%, var(--material-strong));
   --shadow: 0 22px 58px rgba(0, 0, 0, 0.34);
+  --content-sheen: 7%;
+  --content-brightness: 0.98;
 }
 
 * {
@@ -528,11 +539,15 @@ h3 {
   border: 1px solid var(--material-border);
   border-radius: var(--radius);
   background:
-    linear-gradient(180deg, color-mix(in srgb, #ffffff 22%, transparent), transparent 38%),
+    linear-gradient(165deg, color-mix(in srgb, #ffffff var(--content-sheen), transparent), transparent 42%),
     linear-gradient(135deg, color-mix(in srgb, var(--accent) 3%, transparent), transparent 52%),
     var(--material);
-  box-shadow: var(--shadow-soft);
-  backdrop-filter: blur(22px) saturate(1.08);
+  box-shadow:
+    var(--shadow-soft),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 58%, transparent),
+    inset 0 0 0 0.5px color-mix(in srgb, var(--accent) 9%, transparent);
+  -webkit-backdrop-filter: blur(var(--content-blur)) saturate(var(--content-saturation)) brightness(var(--content-brightness));
+  backdrop-filter: blur(var(--content-blur)) saturate(var(--content-saturation)) brightness(var(--content-brightness));
   padding: 1rem;
   transition:
     border-color 180ms ease,
@@ -598,11 +613,15 @@ h3 {
   border-radius: var(--radius);
   padding: 1.2rem;
   background:
-    linear-gradient(180deg, color-mix(in srgb, #ffffff 30%, transparent), transparent 42%),
+    linear-gradient(165deg, color-mix(in srgb, #ffffff var(--content-sheen), transparent), transparent 46%),
     radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 32rem),
     var(--material-strong);
-  box-shadow: var(--shadow), 0 14px 34px color-mix(in srgb, var(--accent) 6%, transparent);
-  backdrop-filter: blur(24px) saturate(1.12);
+  box-shadow:
+    var(--shadow),
+    0 14px 34px color-mix(in srgb, var(--accent) 6%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 62%, transparent);
+  -webkit-backdrop-filter: blur(var(--content-blur)) saturate(var(--content-saturation)) brightness(var(--content-brightness));
+  backdrop-filter: blur(var(--content-blur)) saturate(var(--content-saturation)) brightness(var(--content-brightness));
   transition:
     border-color 180ms ease,
     box-shadow 180ms ease,
@@ -1741,10 +1760,13 @@ button.currency-breakdown-chip.interactive:active {
   border-radius: var(--radius);
   padding: 0.65rem;
   background:
-    linear-gradient(180deg, color-mix(in srgb, #ffffff 18%, transparent), transparent),
-    var(--material-strong);
-  box-shadow: 0 5px 16px rgba(36, 34, 28, 0.032);
-  backdrop-filter: blur(14px) saturate(1.06);
+    linear-gradient(165deg, color-mix(in srgb, #ffffff 9%, transparent), transparent 44%),
+    color-mix(in srgb, var(--surface-2) 20%, var(--material-strong));
+  box-shadow:
+    0 5px 16px rgba(36, 34, 28, 0.032),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 48%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+  backdrop-filter: blur(16px) saturate(1.1);
   animation: row-in 160ms ease-out both;
   transition:
     border-color 160ms ease,
@@ -2292,7 +2314,7 @@ button.currency-breakdown-chip.interactive:active {
   border-left: 3px solid var(--accent);
   padding: 0.78rem 0.85rem;
   border-radius: var(--radius);
-  background: color-mix(in srgb, var(--surface-2) 76%, var(--surface));
+  background: color-mix(in srgb, var(--surface-2) 18%, var(--material-strong));
 }
 
 .budget-pace {
@@ -2302,7 +2324,7 @@ button.currency-breakdown-chip.interactive:active {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 0.65rem;
-  background: color-mix(in srgb, var(--surface-2) 65%, var(--surface));
+  background: color-mix(in srgb, var(--surface-2) 18%, var(--material));
 }
 
 .budget-pace span {
